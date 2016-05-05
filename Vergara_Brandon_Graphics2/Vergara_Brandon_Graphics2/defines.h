@@ -4,6 +4,7 @@
 #include "XTime.h"
 #include "SharedDefines.h"
 #include <DirectXMath.h>
+#include "Cube.h"
 using namespace std;
 using namespace DirectX;
 
