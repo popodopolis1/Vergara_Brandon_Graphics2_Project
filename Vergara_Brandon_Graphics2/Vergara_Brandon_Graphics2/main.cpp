@@ -20,6 +20,8 @@ using namespace std;
 // TODO: PART 2 STEP 6
 #include "Trivial_PS.csh"
 #include "Trivial_VS.csh"
+#include "Star_PS.csh"
+#include "Star_VS.csh"
 
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
@@ -49,18 +51,26 @@ class DEMO_APP
 	ID3D11Buffer *ibuffSky;
 	UINT numVerts = 0;
 	ID3D11InputLayout *layout;
+	ID3D11InputLayout *layout2;
 	ID3D11ShaderResourceView *pSRV = {};
 	ID3D11SamplerState* samState;
 
 	ID3D11RasterizerState* rasState;
+	ID3D11RasterizerState* rasState2;
 	
 	// TODO: PART 2 STEP 4
 	ID3D11VertexShader *vShade;
+	ID3D11VertexShader *vShade2;
 	ID3D11PixelShader *pShade;
+	ID3D11PixelShader *pShade2;
 	// BEGIN PART 3
 	// TODO: PART 3 STEP 1
 	ID3D11Buffer *ncBuff;
 	XTime timer;
+
+	XMMATRIX camera;
+
+	XMMATRIX starMatrix;
 
 public:
 	// BEGIN PART 2
@@ -78,6 +88,7 @@ public:
 		XMMATRIX worldMatrix;
 		XMMATRIX viewMatrix;
 		XMMATRIX projectionMatrix;
+		
 	};
 
 	OBJECT toObject;
@@ -276,24 +287,35 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 
 	device->CreateDepthStencilView(pDepthStencil, &descDSV, &pDSV);
-
-	// TODO: PART 5 STEP 3
 		
-	// TODO: PART 2 STEP 5
-	// ADD SHADERS TO PROJECT, SET BUILD OPTIONS & COMPILE
-
-	// TODO: PART 2 STEP 7
+	
 	device->CreateVertexShader(Trivial_VS, sizeof(Trivial_VS), NULL, &vShade);
 	device->CreatePixelShader(Trivial_PS, sizeof(Trivial_PS), NULL, &pShade);
-	// TODO: PART 2 STEP 8a
+
+    device->CreateVertexShader(Star_VS, sizeof(Star_VS), NULL, &vShade2);
+	device->CreatePixelShader(Star_PS, sizeof(Star_PS), NULL, &pShade2);
+	
 	D3D11_INPUT_ELEMENT_DESC vLayout[3] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXTURE_COORDINATES", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "NORMALS", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		//{"INSTPOS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,1,0,D3D11_INPUT_PER_INSTANCE_DATA, 0},
+		//{"x_axis", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,1,12,D3D11_INPUT_PER_INSTANCE_DATA, 0},
+		//{"y_axis", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,1,24,D3D11_INPUT_PER_INSTANCE_DATA, 0},
+		//{"z_axis", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,1,36,D3D11_INPUT_PER_INSTANCE_DATA, 0}
 	};
-	// TODO: PART 2 STEP 8b
+
 	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), Trivial_VS, sizeof(Trivial_VS), &layout);
+
+	D3D11_INPUT_ELEMENT_DESC vLayout2[2] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
+	device->CreateInputLayout(vLayout2, ARRAYSIZE(vLayout2), Star_VS, sizeof(Star_VS), &layout2);
+	
 
 	D3D11_SAMPLER_DESC descSam = {};
 	descSam.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -322,6 +344,20 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	device->CreateRasterizerState(&descRas, &rasState);
 
+	D3D11_RASTERIZER_DESC descRas2 = {};
+	descRas.FillMode = D3D11_FILL_SOLID;
+	descRas.CullMode = D3D11_CULL_BACK;
+	descRas.FrontCounterClockwise = FALSE;
+	descRas.DepthBias = 0;
+	descRas.SlopeScaledDepthBias = 0.0f;
+	descRas.DepthBiasClamp = 0.0f;
+	descRas.DepthClipEnable = TRUE;
+	descRas.ScissorEnable = FALSE;
+	descRas.MultisampleEnable = FALSE;
+	descRas.AntialiasedLineEnable = TRUE;
+
+	device->CreateRasterizerState(&descRas, &rasState2);
+
 
 	D3D11_BUFFER_DESC cb;
 	ZeroMemory(&cb, sizeof(cb));
@@ -337,12 +373,20 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	CreateDDSTextureFromFile(device, L"SunsetSkybox.dds", nullptr, &pSRV);
 
-	// TODO: PART 3 STEP 4b
-	toObject.worldMatrix = XMMatrixMultiply(XMMatrixTranslation(0, -0.5f, 0), XMMatrixIdentity());
-	toObject.viewMatrix = XMMatrixIdentity();
-	toObject.projectionMatrix = XMMatrixPerspectiveFovLH(65.0f, BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT, 0.1f, 100.0f);
+	
+	toObject.worldMatrix = XMMatrixIdentity();
+	camera = XMMatrixIdentity();
+
+	camera = XMMatrixIdentity();
+	toObject.projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(65.0f), (float)BACKBUFFER_WIDTH / (float)BACKBUFFER_HEIGHT, 0.1f, 100.0f);
 	timer.Signal();
+
+
+	starMatrix = XMMatrixIdentity();
+	starMatrix = XMMatrixTranslation(0, 0, 5);
 }
+
+
 
 //************************************************************
 //************ EXECUTION *************************************
@@ -351,82 +395,85 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 bool DEMO_APP::Run()
 {
 #pragma region CameraControl
+
+	// replace with "Camera" matrix
 	if (GetAsyncKeyState('W'))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.001f), toObject.viewMatrix);
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.001f), camera);
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState('A'))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(XMMatrixTranslation(-0.001f, 0, 0), toObject.viewMatrix);
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(XMMatrixTranslation(-0.001f, 0, 0), camera);
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState('S'))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.001f), toObject.viewMatrix);
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.001f), camera);
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState('D'))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(XMMatrixTranslation(0.001f, 0, 0), toObject.viewMatrix);
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(XMMatrixTranslation(0.001f, 0, 0), camera);
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 
 	if (GetAsyncKeyState(VK_UP))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, XMMatrixTranslation(0, 0.001f, 0));
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, 0.001f, 0));
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState(VK_DOWN))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, XMMatrixTranslation(0, -0.001f, 0));
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, -0.001f, 0));
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD4))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, XMMatrixRotationY(0.001f));
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(camera, XMMatrixRotationY(0.001f));
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD6))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, XMMatrixRotationY(-0.001f));
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(camera, XMMatrixRotationY(-0.001f));
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD8))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(XMMatrixRotationX(0.001f), toObject.viewMatrix);
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(XMMatrixRotationX(0.001f), camera);
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 
 	if (GetAsyncKeyState(VK_NUMPAD2))
 	{
-		XMMATRIX viewTemp = toObject.viewMatrix;
-		toObject.viewMatrix = XMMatrixIdentity();
-		toObject.viewMatrix = XMMatrixMultiply(XMMatrixRotationX(-0.001f), toObject.viewMatrix);
-		toObject.viewMatrix = XMMatrixMultiply(toObject.viewMatrix, viewTemp);
+		//XMMATRIX viewTemp = camera;
+		//camera = XMMatrixIdentity();
+		camera = XMMatrixMultiply(XMMatrixRotationX(-0.001f), camera);
+		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 #pragma endregion 
 
-	//XMMATRIX rotation = XMMatrixRotationY((float)timer.Delta() * 0.01f);
+	//XMMATRIX rotation = XMMatrixRotationY((float)timer.Delta() * 0.005f);
 	//toObject.worldMatrix = XMMatrixMultiply(rotation, toObject.worldMatrix);
+
 
 	context->OMSetRenderTargets(1, &pView, pDSV);
 
@@ -435,32 +482,19 @@ bool DEMO_APP::Run()
 	float colors[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
 	context->ClearRenderTargetView(pView, colors);
 	context->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1, 0);
-	
+	/////////////////////////////////////////////////////////////////////////
+	// skybox
+	toObject.viewMatrix = XMMatrixInverse(nullptr, camera);
+	toObject.worldMatrix = XMMatrixTranslation(camera.r[3].m128_f32[0], camera.r[3].m128_f32[1], camera.r[3].m128_f32[2]);
+
 	D3D11_MAPPED_SUBRESOURCE sub;
 	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
 	memcpy(sub.pData, &toObject, sizeof(toObject));
 	context->Unmap(ncBuff, 0);
 
 	context->VSSetConstantBuffers(0, 1, &ncBuff);
-	
-	UINT offset = 0;
-	UINT stride = sizeof(SIMPLE_VERTEX);
-	
-	context->IASetVertexBuffers(0, 1, &vertBuff, &stride, &offset);
-	context->IASetIndexBuffer(ibuff, DXGI_FORMAT_R32_UINT, offset);
-
-	context->VSSetShader(vShade, NULL, 0);
-	context->PSSetShader(pShade, NULL, 0);
-
-	context->IASetInputLayout(layout);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	
-	context->DrawIndexed(60, 0, 0);
-
-
-	context->PSSetShaderResources(0, 1, &pSRV);
-	context->PSSetSamplers(0, 1, &samState);
 
 	UINT offsetSky = 0;
 	UINT strideSky = sizeof(_OBJ_VERT_);
@@ -468,10 +502,42 @@ bool DEMO_APP::Run()
 	context->IASetVertexBuffers(0, 1, &vertBuffSky, &strideSky, &offsetSky);
 	context->IASetIndexBuffer(ibuffSky, DXGI_FORMAT_R32_UINT, offsetSky);
 
+	context->VSSetShader(vShade, NULL, 0);
+	context->PSSetShader(pShade, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV);
+	context->PSSetSamplers(0, 1, &samState);
+
+	context->IASetInputLayout(layout);
+
 	context->RSSetState(rasState);
 
-
 	context->DrawIndexed(1692, 0, 0);
+
+	context->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1, 0);
+	/////////////////////////////////////////////////////////////////////////
+
+
+	/////////////////////////////////////////////////////////////////////////
+	// star
+	starMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), starMatrix);
+	toObject.worldMatrix = starMatrix;
+
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
+	memcpy(sub.pData, &toObject, sizeof(toObject));
+	context->Unmap(ncBuff, 0);
+
+	UINT offset = 0;
+	UINT stride = sizeof(SIMPLE_VERTEX);
+	context->IASetVertexBuffers(0, 1, &vertBuff, &stride, &offset);
+	context->IASetIndexBuffer(ibuff, DXGI_FORMAT_R32_UINT, offset);
+	context->VSSetShader(vShade2, NULL, 0);
+	context->PSSetShader(pShade2, NULL, 0);
+	context->IASetInputLayout(layout2);
+	context->RSSetState(rasState2);
+	context->DrawIndexed(60, 0, 0);
+	/////////////////////////////////////////////////////////////////////////
+
+
 
 	swapChain->Present(0, 0);
 	return true; 
@@ -501,6 +567,10 @@ bool DEMO_APP::ShutDown()
 	rasState->Release();
 	pSRV->Release();
 	samState->Release();
+	vShade2->Release();
+	pShade2->Release();
+	layout2->Release();
+	rasState2->Release();
 
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;

@@ -45,10 +45,14 @@
   <ItemGroup>
     <None Include="Trivial_PS.csh" />
     <None Include="Trivial_VS.csh" />
+    <None Include="Star_PS.csh" />
+    <None Include="Star_VS.csh" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Trivial_PS.hlsl" />
     <FxCompile Include="Trivial_VS.hlsl" />
+    <FxCompile Include="Star_PS.hlsl" />
+    <FxCompile Include="Star_VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="SunsetSkybox.dds" />

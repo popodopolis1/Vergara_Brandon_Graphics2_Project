@@ -2,17 +2,14 @@
 
 struct INPUT_VERTEX
 {
-	float3 coordinate : POSITION;
-	float3 texcoords : TEXTURE_COORDINATES;
-	float3 norms : NORMALS;
+	float4 coordinate : POSITION;
+	float4 color : COLOR;
 };
-
 
 struct OUTPUT_VERTEX
 {
 	float4 projectedCoordinate : SV_POSITION;
-	float4 texOut : TEXTURE_COORDINATES;
-	float4 normOut : NORMALS;
+	float4 colorOut : COLOR;
 };
 
 // TODO: PART 3 STEP 2a
@@ -28,26 +25,22 @@ OUTPUT_VERTEX main(INPUT_VERTEX fromVertexBuffer)
 {
 	OUTPUT_VERTEX sendToRasterizer = (OUTPUT_VERTEX)0;
 
-	fromVertexBuffer.coordinate.y = fromVertexBuffer.coordinate.y * 2 - 1;;
+	// TODO : PART 4 STEP 4
+	//sendToRasterizer.projectedCoordinate.xy += constantOffset;
 
-	float4 localH = { fromVertexBuffer.coordinate, 1 };
+	// TODO : PART 3 STEP 7
+	//sendToRasterizer.colorOut = constantColor;
+	// END PART 3
+	float4 localH = fromVertexBuffer.coordinate;
 
 	localH = mul(localH, worldMatrix);
 	localH = mul(localH, viewMatrix);
 	localH = mul(localH, projectionMatrix);
 
+	//sendToRasterizer.projectedCoordinate.w = 1;
 	sendToRasterizer.projectedCoordinate = localH;
-		
-	float4 texTemp = localH;
 
-		float4 normTemp = { fromVertexBuffer.norms, 0 };
-
-		normTemp.y = normTemp.y * 2 - 1;
-
-	float4 inTemp = { fromVertexBuffer.coordinate, 1 };
-	sendToRasterizer.texOut = inTemp;
-	sendToRasterizer.normOut = normTemp;
-
+	//sendToRasterizer.projectedCoordinate = localH;
+	sendToRasterizer.colorOut = fromVertexBuffer.color;
 	return sendToRasterizer;
 }
-
