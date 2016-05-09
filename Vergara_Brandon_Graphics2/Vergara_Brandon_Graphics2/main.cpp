@@ -8,6 +8,7 @@
 #include <string.h>
 #include "defines.h"
 #include "DDSTextureLoader.h"
+#include <vector>
 
 using namespace std;
 
@@ -22,6 +23,7 @@ using namespace std;
 #include "Trivial_VS.csh"
 #include "Star_PS.csh"
 #include "Star_VS.csh"
+
 
 #define BACKBUFFER_WIDTH	500
 #define BACKBUFFER_HEIGHT	500
@@ -83,6 +85,10 @@ public:
 		//float r, g, b, a;
 	};
 
+	vector<float3> verts;
+	vector<float2> uvs;
+	vector<float3> norms;
+
 	struct OBJECT
 	{
 		XMMATRIX worldMatrix;
@@ -97,6 +103,90 @@ public:
 	bool Run();
 	bool ShutDown();
 };
+
+bool loadOBJ(const char* path, vector<float3> out_verts, vector<float2> out_uvs, vector<float3> out_norms)
+{
+	vector<unsigned int> vertexIndices, uvIndices, normalIndices;
+	vector< float3 > temp_vertices;
+	vector< float2 > temp_uvs;
+	vector< float3 > temp_normals;
+
+	FILE* file = fopen(path, "r");
+	if (file == NULL)
+	{
+		return false;
+	}
+
+	while (true)
+	{
+		char lineHeader[128];
+
+		int res = fscanf_s(file, "%s", lineHeader);
+		if (res == EOF)
+		{
+			break;
+		}
+		if (strcmp(lineHeader, "v") == 0)
+		{
+			float3 vertex;
+			fscanf_s(file, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
+			temp_vertices.push_back(vertex);
+		}
+		else if (strcmp(lineHeader, "vt") == 0)
+		{
+			float2 uv;
+			fscanf_s(file, "%f %f\n", &uv.x, &uv.y);
+			temp_uvs.push_back(uv);
+		}
+		else if (strcmp(lineHeader, "vn") == 0)
+		{
+			float3 normal;
+			fscanf_s(file, "%f %f %f\n", &normal.x, &normal.y, &normal.z);
+			temp_normals.push_back(normal);
+		}
+		else if (strcmp(lineHeader, "f") == 0)
+		{
+			string vertex1, vertex2, vertex3;
+			unsigned int vertexIndex[3], uvIndex[3], normalIndex[3];
+			int matches = fscanf_s(file, "%d/%d/%d %d/%d/%d %d/%d/%d\n", &vertexIndex[0], &uvIndex[0], &normalIndex[0], &vertexIndex[1], &uvIndex[1], &normalIndex[1], &vertexIndex[2], &uvIndex[2], &normalIndex[2]);
+			if (matches != 9)
+			{
+				return false;
+			}
+
+			vertexIndices.push_back(vertexIndex[0]);
+			vertexIndices.push_back(vertexIndex[1]);
+			vertexIndices.push_back(vertexIndex[2]);
+			uvIndices.push_back(uvIndex[0]);
+			uvIndices.push_back(uvIndex[1]);
+			uvIndices.push_back(uvIndex[2]);
+			normalIndices.push_back(normalIndex[0]);
+			normalIndices.push_back(normalIndex[1]);
+			normalIndices.push_back(normalIndex[2]);
+
+			for (unsigned int i = 0; i < vertexIndices.size(); i++)
+			{
+				unsigned int vertIndex = vertexIndices[i];
+				float3 vert = temp_vertices[vertIndex - 1];
+				out_verts.push_back(vert);
+			}
+			for (unsigned int i = 0; i < uvIndices.size(); i++)
+			{
+				unsigned int uvIndex = vertexIndices[i];
+				float2 uv = temp_uvs[uvIndex - 1];
+				out_uvs.push_back(uv);
+			}
+			for (unsigned int i = 0; i < normalIndices.size(); i++)
+			{
+				unsigned int normIndex = vertexIndices[i];
+				float3 norm = temp_normals[normIndex - 1];
+				out_norms.push_back(norm);
+			}
+
+		}
+	}
+	return true;
+}
 
 //************************************************************
 //************ CREATION OF OBJECTS & RESOURCES ***************
@@ -315,7 +405,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	};
 
 	device->CreateInputLayout(vLayout2, ARRAYSIZE(vLayout2), Star_VS, sizeof(Star_VS), &layout2);
-	
+
 
 	D3D11_SAMPLER_DESC descSam = {};
 	descSam.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -373,6 +463,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	CreateDDSTextureFromFile(device, L"SunsetSkybox.dds", nullptr, &pSRV);
 
+
+	//bool hr = loadOBJ("teapot.obj", verts, uvs, norms);
+
 	
 	toObject.worldMatrix = XMMatrixIdentity();
 	camera = XMMatrixIdentity();
@@ -395,85 +488,47 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 bool DEMO_APP::Run()
 {
 #pragma region CameraControl
-
-	// replace with "Camera" matrix
 	if (GetAsyncKeyState('W'))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
 		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.001f), camera);
-		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState('A'))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
 		camera = XMMatrixMultiply(XMMatrixTranslation(-0.001f, 0, 0), camera);
-		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState('S'))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
 		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.001f), camera);
-		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState('D'))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
 		camera = XMMatrixMultiply(XMMatrixTranslation(0.001f, 0, 0), camera);
-		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
-
 	if (GetAsyncKeyState(VK_UP))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
 		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, 0.001f, 0));
-		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState(VK_DOWN))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
 		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, -0.001f, 0));
-		//camera = XMMatrixMultiply(camera, viewTemp);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD4))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
-		camera = XMMatrixMultiply(camera, XMMatrixRotationY(0.001f));
-		//camera = XMMatrixMultiply(camera, viewTemp);
+		camera = XMMatrixMultiply(XMMatrixRotationY(-0.001f), camera);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD6))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
-		camera = XMMatrixMultiply(camera, XMMatrixRotationY(-0.001f));
-		//camera = XMMatrixMultiply(camera, viewTemp);
+		camera = XMMatrixMultiply(XMMatrixRotationY(0.001f), camera);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD8))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
-		camera = XMMatrixMultiply(XMMatrixRotationX(0.001f), camera);
-		//camera = XMMatrixMultiply(camera, viewTemp);
+		camera = XMMatrixMultiply(XMMatrixRotationX(-0.001f), camera);
 	}
-
 	if (GetAsyncKeyState(VK_NUMPAD2))
 	{
-		//XMMATRIX viewTemp = camera;
-		//camera = XMMatrixIdentity();
-		camera = XMMatrixMultiply(XMMatrixRotationX(-0.001f), camera);
-		//camera = XMMatrixMultiply(camera, viewTemp);
+		camera = XMMatrixMultiply(XMMatrixRotationX(0.001f), camera);
 	}
 #pragma endregion 
-
-	//XMMATRIX rotation = XMMatrixRotationY((float)timer.Delta() * 0.005f);
-	//toObject.worldMatrix = XMMatrixMultiply(rotation, toObject.worldMatrix);
-
 
 	context->OMSetRenderTargets(1, &pView, pDSV);
 

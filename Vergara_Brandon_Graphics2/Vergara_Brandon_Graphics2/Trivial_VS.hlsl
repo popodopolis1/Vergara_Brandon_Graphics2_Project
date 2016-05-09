@@ -40,9 +40,9 @@ OUTPUT_VERTEX main(INPUT_VERTEX fromVertexBuffer)
 		
 	float4 texTemp = localH;
 
-		float4 normTemp = { fromVertexBuffer.norms, 0 };
+	float4 normTemp = { fromVertexBuffer.norms, 0 };
 
-		normTemp.y = normTemp.y * 2 - 1;
+	normTemp.y = normTemp.y * 2 - 1;
 
 	float4 inTemp = { fromVertexBuffer.coordinate, 1 };
 	sendToRasterizer.texOut = inTemp;
