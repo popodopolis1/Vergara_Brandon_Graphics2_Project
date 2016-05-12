@@ -23,6 +23,9 @@ using namespace std;
 #include "Trivial_VS.csh"
 #include "Star_PS.csh"
 #include "Star_VS.csh"
+#include "OBJ_VS.csh"
+#include "OBJ_PS.csh"
+
 
 
 #define BACKBUFFER_WIDTH	500
@@ -49,11 +52,14 @@ class DEMO_APP
 	ID3D11Buffer *buff;
 	ID3D11Buffer *vertBuff;
 	ID3D11Buffer *vertBuffSky;
+	ID3D11Buffer *vertBuffCube;
 	ID3D11Buffer *ibuff;
 	ID3D11Buffer *ibuffSky;
+	ID3D11Buffer *ibuffCube;
 	UINT numVerts = 0;
 	ID3D11InputLayout *layout;
 	ID3D11InputLayout *layout2;
+	ID3D11InputLayout *layout3;
 	ID3D11ShaderResourceView *pSRV = {};
 	ID3D11SamplerState* samState;
 
@@ -63,15 +69,18 @@ class DEMO_APP
 	// TODO: PART 2 STEP 4
 	ID3D11VertexShader *vShade;
 	ID3D11VertexShader *vShade2;
+	ID3D11VertexShader *vShade3;
 	ID3D11PixelShader *pShade;
 	ID3D11PixelShader *pShade2;
+	ID3D11PixelShader *pShade3;
+
 	// BEGIN PART 3
 	// TODO: PART 3 STEP 1
 	ID3D11Buffer *ncBuff;
 	XTime timer;
 
 	XMMATRIX camera;
-
+	XMMATRIX objMatrix;
 	XMMATRIX starMatrix;
 
 public:
@@ -85,9 +94,18 @@ public:
 		//float r, g, b, a;
 	};
 
-	vector<float3> verts;
-	vector<float2> uvs;
-	vector<float3> norms;
+	struct NEW_VERTEX
+	{
+		XMFLOAT3 pos;
+		XMFLOAT2 uvs;
+		XMFLOAT3 norms;
+	};
+
+
+	vector<XMFLOAT3> verts;
+	vector<XMFLOAT2> uvs;
+	vector<XMFLOAT3> norms;
+	vector<uint> inds;
 
 	struct OBJECT
 	{
@@ -104,45 +122,48 @@ public:
 	bool ShutDown();
 };
 
-bool loadOBJ(const char* path, vector<float3> out_verts, vector<float2> out_uvs, vector<float3> out_norms)
+bool loadOBJ(const char* path, vector<XMFLOAT3> &out_verts, vector<XMFLOAT2> &out_uvs, vector<XMFLOAT3> &out_norms, vector<uint> &out_inds)
 {
 	vector<unsigned int> vertexIndices, uvIndices, normalIndices;
-	vector< float3 > temp_vertices;
-	vector< float2 > temp_uvs;
-	vector< float3 > temp_normals;
+	vector< XMFLOAT3 > temp_vertices;
+	vector< XMFLOAT2 > temp_uvs;
+	vector< XMFLOAT3 > temp_normals;
 
 	FILE* file = fopen(path, "r");
 	if (file == NULL)
 	{
 		return false;
 	}
-
+	
 	while (true)
 	{
 		char lineHeader[128];
 
-		int res = fscanf_s(file, "%s", lineHeader);
+		int res = fscanf_s(file, "%s", lineHeader, 128);
 		if (res == EOF)
 		{
 			break;
 		}
 		if (strcmp(lineHeader, "v") == 0)
 		{
-			float3 vertex;
+			XMFLOAT3 vertex;
 			fscanf_s(file, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
 			temp_vertices.push_back(vertex);
+			out_verts.push_back(vertex);
 		}
 		else if (strcmp(lineHeader, "vt") == 0)
 		{
-			float2 uv;
+			XMFLOAT2 uv;
 			fscanf_s(file, "%f %f\n", &uv.x, &uv.y);
-			temp_uvs.push_back(uv);
+			//temp_uvs.push_back(uv);
+			out_uvs.push_back(uv);
 		}
 		else if (strcmp(lineHeader, "vn") == 0)
 		{
-			float3 normal;
+			XMFLOAT3 normal;
 			fscanf_s(file, "%f %f %f\n", &normal.x, &normal.y, &normal.z);
-			temp_normals.push_back(normal);
+			//temp_normals.push_back(normal);
+			out_norms.push_back(normal);
 		}
 		else if (strcmp(lineHeader, "f") == 0)
 		{
@@ -166,25 +187,27 @@ bool loadOBJ(const char* path, vector<float3> out_verts, vector<float2> out_uvs,
 
 			for (unsigned int i = 0; i < vertexIndices.size(); i++)
 			{
-				unsigned int vertIndex = vertexIndices[i];
-				float3 vert = temp_vertices[vertIndex - 1];
-				out_verts.push_back(vert);
+				uint vertIndex = vertexIndices[i];
+				//XMFLOAT3 vert = temp_vertices[vertIndex - 1];
+				out_inds.push_back(vertIndex);
 			}
-			for (unsigned int i = 0; i < uvIndices.size(); i++)
-			{
-				unsigned int uvIndex = vertexIndices[i];
-				float2 uv = temp_uvs[uvIndex - 1];
-				out_uvs.push_back(uv);
-			}
-			for (unsigned int i = 0; i < normalIndices.size(); i++)
-			{
-				unsigned int normIndex = vertexIndices[i];
-				float3 norm = temp_normals[normIndex - 1];
-				out_norms.push_back(norm);
-			}
+			//for (unsigned int i = 0; i < uvIndices.size(); i++)
+			//{
+			//	unsigned int uvIndex = vertexIndices[i];
+			//	XMFLOAT2 uv = temp_uvs[uvIndex - 1];
+			//	out_uvs.push_back(uv);
+			//}
+			//for (unsigned int i = 0; i < normalIndices.size(); i++)
+			//{
+			//	unsigned int normIndex = vertexIndices[i];
+			//	XMFLOAT3 norm = temp_normals[normIndex - 1];
+			//	out_norms.push_back(norm);
+			//}
 
 		}
 	}
+	
+
 	return true;
 }
 
@@ -198,7 +221,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	// WINDOWS CODE, I DON'T TEACH THIS YOU MUST KNOW IT ALREADY! 
 	application = hinst; 
 	appWndProc = proc; 
-
+	
 	WNDCLASSEX  wndClass;
     ZeroMemory( &wndClass, sizeof( wndClass ) );
     wndClass.cbSize         = sizeof( WNDCLASSEX );             
@@ -291,8 +314,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	uint indices[60] = { 0, 2, 1, 0, 3, 2, 0, 4, 3, 0, 5, 4, 0, 6, 5, 0, 7, 6, 0, 8, 7, 0, 9, 8, 0, 10, 9, 0, 1, 10, 11, 1, 2, 11, 2, 3, 11, 3, 4, 11, 4, 5, 11, 5, 6, 11, 6, 7, 11, 7, 8, 11, 8, 9, 11, 9, 10, 11, 10, 1 };
 
-	// BEGIN PART 4
-	// TODO: PART 4 STEP 1
+
 	D3D11_BUFFER_DESC vb;
 	ZeroMemory(&vb, sizeof(vb));
 
@@ -355,8 +377,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	
 	device->CreateBuffer(&ibSky, &intDatSky, &ibuffSky);
 	
-	// TODO: PART 5 STEP 2b
-	
 	D3D11_TEXTURE2D_DESC descDepth;
 	descDepth.Width = BACKBUFFER_WIDTH;
 	descDepth.Height = BACKBUFFER_HEIGHT;
@@ -384,6 +404,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
     device->CreateVertexShader(Star_VS, sizeof(Star_VS), NULL, &vShade2);
 	device->CreatePixelShader(Star_PS, sizeof(Star_PS), NULL, &pShade2);
+
+	device->CreateVertexShader(OBJ_VS, sizeof(OBJ_VS), NULL, &vShade3);
+	device->CreatePixelShader(OBJ_PS, sizeof(OBJ_PS), NULL, &pShade3);
 	
 	D3D11_INPUT_ELEMENT_DESC vLayout[3] =
 	{
@@ -405,6 +428,15 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	};
 
 	device->CreateInputLayout(vLayout2, ARRAYSIZE(vLayout2), Star_VS, sizeof(Star_VS), &layout2);
+
+	D3D11_INPUT_ELEMENT_DESC vLayout3[3] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXTURE_COORDINATES", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMALS", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
+	device->CreateInputLayout(vLayout3, ARRAYSIZE(vLayout3), OBJ_VS, sizeof(OBJ_VS), &layout3);
 
 
 	D3D11_SAMPLER_DESC descSam = {};
@@ -463,8 +495,65 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	CreateDDSTextureFromFile(device, L"SunsetSkybox.dds", nullptr, &pSRV);
 
+	bool hr = loadOBJ("cube.obj", verts, uvs, norms, inds);
+	
+	NEW_VERTEX objCube[8];
 
-	//bool hr = loadOBJ("teapot.obj", verts, uvs, norms);
+#pragma region OBJ verts
+
+	for (int i = 0; i < verts.size(); ++i)
+	{
+		objCube[i].pos = verts[i];
+	}
+	for (int i = 0; i < verts.size(); ++i)
+	{
+		objCube[i].uvs = uvs[i];
+	}
+	for (int i = 0; i < norms.size(); ++i)
+	{
+		objCube[i].norms = norms[i];
+	}
+
+#pragma endregion
+
+	uint inds1[234];
+
+	for (int i = 0; i < inds.size(); ++i)
+	{
+		inds1[i] = inds[i];
+	}
+
+
+	D3D11_BUFFER_DESC vbCube;
+	ZeroMemory(&vbCube, sizeof(vbCube));
+	
+	vbCube.Usage = D3D11_USAGE_IMMUTABLE;
+	vbCube.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	vbCube.CPUAccessFlags = NULL;
+	vbCube.ByteWidth = sizeof(NEW_VERTEX) * 8;
+	vbCube.MiscFlags = 0;
+	
+	D3D11_SUBRESOURCE_DATA inDatCube;
+	inDatCube.pSysMem = objCube;
+	inDatCube.SysMemPitch = 0;
+	inDatCube.SysMemSlicePitch = 0;
+	
+	device->CreateBuffer(&vbCube, &inDatCube, &vertBuffCube);
+	
+	D3D11_BUFFER_DESC ibCube;
+	ZeroMemory(&ibCube, sizeof(ibCube));
+	
+	ibCube.Usage = D3D11_USAGE_IMMUTABLE;
+	ibCube.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	ibCube.ByteWidth = sizeof(unsigned int) * 234;
+	ibCube.MiscFlags = 0;
+	
+	D3D11_SUBRESOURCE_DATA intDatCube;
+	intDatCube.pSysMem = inds1;
+	intDatCube.SysMemPitch = 0;
+	intDatCube.SysMemSlicePitch = 0;
+	
+	device->CreateBuffer(&ibCube, &intDatCube, &ibuffCube);
 
 	
 	toObject.worldMatrix = XMMatrixIdentity();
@@ -477,6 +566,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	starMatrix = XMMatrixIdentity();
 	starMatrix = XMMatrixTranslation(0, 0, 5);
+
+	objMatrix = XMMatrixIdentity();
+	objMatrix = XMMatrixTranslation(5, 0, 5);
 }
 
 
@@ -590,6 +682,30 @@ bool DEMO_APP::Run()
 	context->IASetInputLayout(layout2);
 	context->RSSetState(rasState2);
 	context->DrawIndexed(60, 0, 0);
+
+	
+	/////////////////////////////////////////////////////////////////////////
+
+	/////////////////////////////////////////////////////////////////////////
+	// OBJ File
+	objMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), objMatrix);
+	toObject.worldMatrix = objMatrix;
+
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
+	memcpy(sub.pData, &toObject, sizeof(toObject));
+	context->Unmap(ncBuff, 0);
+
+	UINT offsetOBJ = 0;
+	UINT strideOBJ = sizeof(XMFLOAT3);
+	context->IASetVertexBuffers(0, 1, &vertBuffCube, &strideOBJ, &offsetOBJ);
+	context->IASetIndexBuffer(ibuffCube, DXGI_FORMAT_R32_UINT, offsetOBJ);
+	context->VSSetShader(vShade3, NULL, 0);
+	context->PSSetShader(pShade3, NULL, 0);
+	context->IASetInputLayout(layout3);
+	context->RSSetState(rasState2);
+	context->DrawIndexed(234, 0, 0);
+
+
 	/////////////////////////////////////////////////////////////////////////
 
 
@@ -613,6 +729,8 @@ bool DEMO_APP::ShutDown()
 	ibuff->Release();
 	vertBuffSky->Release();
 	ibuffSky->Release();
+	vertBuffCube->Release();
+	ibuffCube->Release();
 	layout->Release();
 	vShade->Release();
 	pShade->Release();
@@ -626,6 +744,9 @@ bool DEMO_APP::ShutDown()
 	pShade2->Release();
 	layout2->Release();
 	rasState2->Release();
+	vShade3->Release();
+	pShade3->Release();
+
 
 	UnregisterClass( L"DirectXApplication", application ); 
 	return true;

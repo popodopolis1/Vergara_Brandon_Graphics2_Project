@@ -47,12 +47,16 @@
     <None Include="Trivial_VS.csh" />
     <None Include="Star_PS.csh" />
     <None Include="Star_VS.csh" />
+    <None Include="OBJ_PS.csh" />
+    <None Include="OBJ_VS.csh" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Trivial_PS.hlsl" />
     <FxCompile Include="Trivial_VS.hlsl" />
     <FxCompile Include="Star_PS.hlsl" />
     <FxCompile Include="Star_VS.hlsl" />
+    <FxCompile Include="OBJ_VS.hlsl" />
+    <FxCompile Include="OBJ_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="SunsetSkybox.dds" />
