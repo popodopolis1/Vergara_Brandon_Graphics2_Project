@@ -61,6 +61,7 @@ class DEMO_APP
 	ID3D11InputLayout *layout2;
 	ID3D11InputLayout *layout3;
 	ID3D11ShaderResourceView *pSRV = {};
+	ID3D11ShaderResourceView *pSRV2 = {};
 	ID3D11SamplerState* samState;
 
 	ID3D11RasterizerState* rasState;
@@ -77,6 +78,7 @@ class DEMO_APP
 	// BEGIN PART 3
 	// TODO: PART 3 STEP 1
 	ID3D11Buffer *ncBuff;
+	ID3D11Buffer *cbPerFrameBuffer;
 	XTime timer;
 
 	XMMATRIX camera;
@@ -114,6 +116,29 @@ public:
 		XMMATRIX projectionMatrix;
 		
 	};
+
+	struct Light
+	{
+		Light()
+		{
+			ZeroMemory(this, sizeof(Light));
+		}
+
+		XMFLOAT3 dir;
+		float pad;
+		XMFLOAT4 ambient;
+		XMFLOAT4 diffuse;
+
+	};
+
+	Light light;
+
+	struct cbPerFrame
+	{
+		Light  light;
+	};
+
+	cbPerFrame constbuffPerFrame;
 
 	OBJECT toObject;
 
@@ -495,6 +520,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	CreateDDSTextureFromFile(device, L"SunsetSkybox.dds", nullptr, &pSRV);
 
+	CreateDDSTextureFromFile(device, L"stone_0001_c.dds", nullptr, &pSRV2);
+
 	bool hr = loadOBJ("cube.obj", verts, uvs, norms, inds);
 	
 	NEW_VERTEX objCube[8];
@@ -554,6 +581,26 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	intDatCube.SysMemSlicePitch = 0;
 	
 	device->CreateBuffer(&ibCube, &intDatCube, &ibuffCube);
+
+
+#pragma region LightCode
+
+	light.dir = XMFLOAT3(0.25f, 0.5f, -1.0f);
+	light.ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	light.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	
+	D3D11_BUFFER_DESC cbLight;
+	ZeroMemory(&cbLight, sizeof(cbLight));
+
+	cbLight.Usage = D3D11_USAGE_DYNAMIC;
+	cbLight.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cbLight.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	cbLight.ByteWidth = sizeof(cbPerFrame);
+	cbLight.MiscFlags = 0;
+
+	device->CreateBuffer(&cbLight, NULL, &cbPerFrameBuffer);
+
+#pragma endregion
 
 	
 	toObject.worldMatrix = XMMatrixIdentity();
@@ -663,6 +710,14 @@ bool DEMO_APP::Run()
 	context->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1, 0);
 	/////////////////////////////////////////////////////////////////////////
 
+	/////////////////////////////////////////////////////////////////////////
+	// Light
+	//constbuffPerFrame.light = light;
+	//
+	//context->UpdateSubresource(cbPerFrameBuffer, 0, NULL, &constbuffPerFrame, 0, 0);
+	//
+	//context->PSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
+	/////////////////////////////////////////////////////////////////////////
 
 	/////////////////////////////////////////////////////////////////////////
 	// star
@@ -690,17 +745,18 @@ bool DEMO_APP::Run()
 	// OBJ File
 	objMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), objMatrix);
 	toObject.worldMatrix = objMatrix;
-
+	
 	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
 	memcpy(sub.pData, &toObject, sizeof(toObject));
 	context->Unmap(ncBuff, 0);
-
+	
 	UINT offsetOBJ = 0;
 	UINT strideOBJ = sizeof(XMFLOAT3);
 	context->IASetVertexBuffers(0, 1, &vertBuffCube, &strideOBJ, &offsetOBJ);
 	context->IASetIndexBuffer(ibuffCube, DXGI_FORMAT_R32_UINT, offsetOBJ);
 	context->VSSetShader(vShade3, NULL, 0);
 	context->PSSetShader(pShade3, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV2);
 	context->IASetInputLayout(layout3);
 	context->RSSetState(rasState2);
 	context->DrawIndexed(234, 0, 0);
@@ -739,13 +795,16 @@ bool DEMO_APP::ShutDown()
 	pDepthStencil->Release();
 	rasState->Release();
 	pSRV->Release();
+	pSRV2->Release();
 	samState->Release();
 	vShade2->Release();
 	pShade2->Release();
 	layout2->Release();
+	layout3->Release();
 	rasState2->Release();
 	vShade3->Release();
 	pShade3->Release();
+	cbPerFrameBuffer->Release();
 
 
 	UnregisterClass( L"DirectXApplication", application ); 
