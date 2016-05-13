@@ -9,6 +9,7 @@
 #include "defines.h"
 #include "DDSTextureLoader.h"
 #include <vector>
+#include <thread>
 
 using namespace std;
 
@@ -119,11 +120,6 @@ public:
 
 	struct Light
 	{
-		Light()
-		{
-			ZeroMemory(this, sizeof(Light));
-		}
-
 		XMFLOAT3 dir;
 		float pad;
 		XMFLOAT4 ambient;
@@ -244,28 +240,28 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 {
 	// ****************** BEGIN WARNING ***********************// 
 	// WINDOWS CODE, I DON'T TEACH THIS YOU MUST KNOW IT ALREADY! 
-	application = hinst; 
-	appWndProc = proc; 
-	
+	application = hinst;
+	appWndProc = proc;
+
 	WNDCLASSEX  wndClass;
-    ZeroMemory( &wndClass, sizeof( wndClass ) );
-    wndClass.cbSize         = sizeof( WNDCLASSEX );             
-    wndClass.lpfnWndProc    = appWndProc;						
-    wndClass.lpszClassName  = L"DirectXApplication";            
-	wndClass.hInstance      = application;		               
-    wndClass.hCursor        = LoadCursor( NULL, IDC_ARROW );    
-    wndClass.hbrBackground  = ( HBRUSH )( COLOR_WINDOWFRAME ); 
+	ZeroMemory(&wndClass, sizeof(wndClass));
+	wndClass.cbSize = sizeof(WNDCLASSEX);
+	wndClass.lpfnWndProc = appWndProc;
+	wndClass.lpszClassName = L"DirectXApplication";
+	wndClass.hInstance = application;
+	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wndClass.hbrBackground = (HBRUSH)(COLOR_WINDOWFRAME);
 	//wndClass.hIcon			= LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_FSICON));
-    RegisterClassEx( &wndClass );
+	RegisterClassEx(&wndClass);
 
 	RECT window_size = { 0, 0, BACKBUFFER_WIDTH, BACKBUFFER_HEIGHT };
 	AdjustWindowRect(&window_size, WS_OVERLAPPEDWINDOW, false);
 
-	window = CreateWindow(	L"DirectXApplication", L"Lab 1a Line Land",	WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME|WS_MAXIMIZEBOX), 
-							CW_USEDEFAULT, CW_USEDEFAULT, window_size.right-window_size.left, window_size.bottom-window_size.top,					
-							NULL, NULL,	application, this );												
+	window = CreateWindow(L"DirectXApplication", L"Lab 1a Line Land", WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX),
+		CW_USEDEFAULT, CW_USEDEFAULT, window_size.right - window_size.left, window_size.bottom - window_size.top,
+		NULL, NULL, application, this);
 
-    ShowWindow( window, SW_SHOW );
+	ShowWindow(window, SW_SHOW);
 	//********************* END WARNING ************************//
 
 	// TODO: PART 1 STEP 3a
@@ -326,12 +322,12 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 			star[i].col.z = 0.0f;
 			star[i].col.w = 1.0f;
 
-			if (i%2 == 0)
+			if (i % 2 == 0)
 			{
-				star[i].pos.x = cos(XMConvertToRadians(i) * 36)/2;
-				star[i].pos.y = sin(XMConvertToRadians(i) * 36)/2;
+				star[i].pos.x = cos(XMConvertToRadians(i) * 36) / 2;
+				star[i].pos.y = sin(XMConvertToRadians(i) * 36) / 2;
 			}
-			
+
 		}
 	}
 
@@ -399,9 +395,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	intDatSky.pSysMem = Cube_indicies;
 	intDatSky.SysMemPitch = 0;
 	intDatSky.SysMemSlicePitch = 0;
-	
+
 	device->CreateBuffer(&ibSky, &intDatSky, &ibuffSky);
-	
+
 	D3D11_TEXTURE2D_DESC descDepth;
 	descDepth.Width = BACKBUFFER_WIDTH;
 	descDepth.Height = BACKBUFFER_HEIGHT;
@@ -422,17 +418,17 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 
 	device->CreateDepthStencilView(pDepthStencil, &descDSV, &pDSV);
-		
-	
+
+
 	device->CreateVertexShader(Trivial_VS, sizeof(Trivial_VS), NULL, &vShade);
 	device->CreatePixelShader(Trivial_PS, sizeof(Trivial_PS), NULL, &pShade);
 
-    device->CreateVertexShader(Star_VS, sizeof(Star_VS), NULL, &vShade2);
+	device->CreateVertexShader(Star_VS, sizeof(Star_VS), NULL, &vShade2);
 	device->CreatePixelShader(Star_PS, sizeof(Star_PS), NULL, &pShade2);
 
 	device->CreateVertexShader(OBJ_VS, sizeof(OBJ_VS), NULL, &vShade3);
 	device->CreatePixelShader(OBJ_PS, sizeof(OBJ_PS), NULL, &pShade3);
-	
+
 	D3D11_INPUT_ELEMENT_DESC vLayout[3] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -476,7 +472,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	descSam.ComparisonFunc = D3D11_COMPARISON_NEVER;
 
 	device->CreateSamplerState(&descSam, &samState);
-	
+
 	D3D11_RASTERIZER_DESC descRas = {};
 	descRas.FillMode = D3D11_FILL_SOLID;
 	descRas.CullMode = D3D11_CULL_FRONT;
@@ -518,11 +514,11 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	device->CreateBuffer(&cb, NULL, &ncBuff);
 
-	CreateDDSTextureFromFile(device, L"SunsetSkybox.dds", nullptr, &pSRV);
+	thread thread1(CreateDDSTextureFromFile,device, L"SunsetSkybox.dds", nullptr, &pSRV,0);
 
-	CreateDDSTextureFromFile(device, L"stone_0001_c.dds", nullptr, &pSRV2);
+	thread thread2(CreateDDSTextureFromFile,device, L"stone_0001_c.dds", nullptr, &pSRV2,0);
 
-	bool hr = loadOBJ("cube.obj", verts, uvs, norms, inds);
+	thread thread3(loadOBJ, "cube.obj", verts, uvs, norms, inds);
 	
 	NEW_VERTEX objCube[8];
 
@@ -597,6 +593,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	cbLight.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	cbLight.ByteWidth = sizeof(cbPerFrame);
 	cbLight.MiscFlags = 0;
+	cbLight.StructureByteStride = sizeof(float);
 
 	device->CreateBuffer(&cbLight, NULL, &cbPerFrameBuffer);
 
@@ -616,6 +613,10 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	objMatrix = XMMatrixIdentity();
 	objMatrix = XMMatrixTranslation(5, 0, 5);
+
+	thread1.join();
+	thread2.join();
+	thread3.join();
 }
 
 
@@ -712,11 +713,13 @@ bool DEMO_APP::Run()
 
 	/////////////////////////////////////////////////////////////////////////
 	// Light
-	//constbuffPerFrame.light = light;
-	//
-	//context->UpdateSubresource(cbPerFrameBuffer, 0, NULL, &constbuffPerFrame, 0, 0);
-	//
-	//context->PSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
+	constbuffPerFrame.light = light;
+
+	//context->VSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
+	
+	context->UpdateSubresource(cbPerFrameBuffer, 0, NULL, &constbuffPerFrame, 0, 0);
+	
+	context->PSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
 	/////////////////////////////////////////////////////////////////////////
 
 	/////////////////////////////////////////////////////////////////////////
@@ -743,7 +746,7 @@ bool DEMO_APP::Run()
 
 	/////////////////////////////////////////////////////////////////////////
 	// OBJ File
-	objMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), objMatrix);
+	objMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians((float)timer.Delta() * 0.5f)), objMatrix);
 	toObject.worldMatrix = objMatrix;
 	
 	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
@@ -759,7 +762,7 @@ bool DEMO_APP::Run()
 	context->PSSetShaderResources(0, 1, &pSRV2);
 	context->IASetInputLayout(layout3);
 	context->RSSetState(rasState2);
-	context->DrawIndexed(234, 0, 0);
+	//context->DrawIndexed(234, 0, 0);
 
 
 	/////////////////////////////////////////////////////////////////////////
