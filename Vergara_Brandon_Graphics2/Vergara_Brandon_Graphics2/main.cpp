@@ -1014,7 +1014,7 @@ bool DEMO_APP::Run()
 
 bool DEMO_APP::ShutDown()
 {
-	// TODO: PART 1 STEP 6
+
 	swapChain->Release();
 	pView->Release();
 	device->Release();
