@@ -49,6 +49,8 @@
     <None Include="Star_VS.csh" />
     <None Include="OBJ_PS.csh" />
     <None Include="OBJ_VS.csh" />
+    <None Include="Box_VS.csh" />
+    <None Include="Box_PS.csh" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Trivial_PS.hlsl" />
@@ -57,6 +59,8 @@
     <FxCompile Include="Star_VS.hlsl" />
     <FxCompile Include="OBJ_VS.hlsl" />
     <FxCompile Include="OBJ_PS.hlsl" />
+    <FxCompile Include="Box_VS.hlsl" />
+    <FxCompile Include="Box_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="SunsetSkybox.dds" />

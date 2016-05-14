@@ -26,6 +26,8 @@ using namespace std;
 #include "Star_VS.csh"
 #include "OBJ_VS.csh"
 #include "OBJ_PS.csh"
+#include "Box_VS.csh"
+#include "Box_PS.csh"
 
 
 
@@ -47,6 +49,7 @@ class DEMO_APP
 	ID3D11DeviceContext *context;
 	ID3D11RenderTargetView *pView;
 	D3D11_VIEWPORT viewport;
+	D3D11_VIEWPORT viewport2;
 	ID3D11DepthStencilView *pDSV;
 	ID3D11Texture2D* pDepthStencil = NULL;
 	// TODO: PART 2 STEP 2
@@ -57,10 +60,13 @@ class DEMO_APP
 	ID3D11Buffer *ibuff;
 	ID3D11Buffer *ibuffSky;
 	ID3D11Buffer *ibuffCube;
+	ID3D11Buffer *vertBuffLTest;
+	ID3D11Buffer *ibuffLTest;
 	UINT numVerts = 0;
 	ID3D11InputLayout *layout;
 	ID3D11InputLayout *layout2;
 	ID3D11InputLayout *layout3;
+	ID3D11InputLayout *layout4;
 	ID3D11ShaderResourceView *pSRV = {};
 	ID3D11ShaderResourceView *pSRV2 = {};
 	ID3D11SamplerState* samState;
@@ -72,9 +78,11 @@ class DEMO_APP
 	ID3D11VertexShader *vShade;
 	ID3D11VertexShader *vShade2;
 	ID3D11VertexShader *vShade3;
+	ID3D11VertexShader *vShade4;
 	ID3D11PixelShader *pShade;
 	ID3D11PixelShader *pShade2;
 	ID3D11PixelShader *pShade3;
+	ID3D11PixelShader *pShade4;
 
 	// BEGIN PART 3
 	// TODO: PART 3 STEP 1
@@ -83,8 +91,10 @@ class DEMO_APP
 	XTime timer;
 
 	XMMATRIX camera;
+	XMMATRIX camera2;
 	XMMATRIX objMatrix;
 	XMMATRIX starMatrix;
+	XMMATRIX boxMatrix;
 
 public:
 	// BEGIN PART 2
@@ -137,6 +147,7 @@ public:
 	cbPerFrame constbuffPerFrame;
 
 	OBJECT toObject;
+	OBJECT toObject2;
 
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
 	bool Run();
@@ -285,11 +296,18 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	// TODO: PART 1 STEP 5
 	ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
 	viewport.Height = BACKBUFFER_HEIGHT;
-	viewport.Width = BACKBUFFER_WIDTH;
+	viewport.Width = BACKBUFFER_WIDTH/2;
 	viewport.TopLeftX = 0;
 	viewport.TopLeftY = 0;
 	viewport.MinDepth = 0;
 	viewport.MaxDepth = 1;
+	ZeroMemory(&viewport2, sizeof(D3D11_VIEWPORT));
+	viewport2.Height = BACKBUFFER_HEIGHT;
+	viewport2.Width = BACKBUFFER_WIDTH/2;
+	viewport2.TopLeftX = BACKBUFFER_WIDTH / 2;
+	viewport2.TopLeftY = 0;
+	viewport2.MinDepth = 0;
+	viewport2.MaxDepth = 1;
 
 	SIMPLE_VERTEX star[12];
 #pragma region Star verts
@@ -429,6 +447,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	device->CreateVertexShader(OBJ_VS, sizeof(OBJ_VS), NULL, &vShade3);
 	device->CreatePixelShader(OBJ_PS, sizeof(OBJ_PS), NULL, &pShade3);
 
+    device->CreateVertexShader(Box_VS, sizeof(Box_VS), NULL, &vShade4);
+	device->CreatePixelShader(Box_PS, sizeof(Box_PS), NULL, &pShade4);
+
 	D3D11_INPUT_ELEMENT_DESC vLayout[3] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -441,6 +462,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	};
 
 	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), Trivial_VS, sizeof(Trivial_VS), &layout);
+	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), Box_VS, sizeof(Box_VS), &layout4);
 
 	D3D11_INPUT_ELEMENT_DESC vLayout2[2] =
 	{
@@ -516,7 +538,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	thread thread1(CreateDDSTextureFromFile,device, L"SunsetSkybox.dds", nullptr, &pSRV,0);
 
-	thread thread2(CreateDDSTextureFromFile,device, L"stone_0001_c.dds", nullptr, &pSRV2,0);
+	thread thread2(CreateDDSTextureFromFile,device, L"dirt3.dds", nullptr, &pSRV2,0);
 
 	thread thread3(loadOBJ, "cube.obj", verts, uvs, norms, inds);
 	
@@ -599,17 +621,55 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma endregion
 
+#pragma region CubeForLighting
+	D3D11_BUFFER_DESC vbLTest;
+	ZeroMemory(&vbLTest, sizeof(vbLTest));
+
+	vbLTest.Usage = D3D11_USAGE_IMMUTABLE;
+	vbLTest.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	vbLTest.CPUAccessFlags = NULL;
+	vbLTest.ByteWidth = sizeof(_OBJ_VERT_) * 776;
+	vbLTest.MiscFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA inDatLTest;
+	inDatLTest.pSysMem = Cube_data;
+	inDatLTest.SysMemPitch = 0;
+	inDatLTest.SysMemSlicePitch = 0;
+
+	device->CreateBuffer(&vbLTest, &inDatLTest, &vertBuffLTest);
+
+	D3D11_BUFFER_DESC ibLTest;
+	ZeroMemory(&ibLTest, sizeof(ibLTest));
+
+	ibLTest.Usage = D3D11_USAGE_IMMUTABLE;
+	ibLTest.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	ibLTest.ByteWidth = sizeof(unsigned int) * 1692;
+	ibLTest.MiscFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA intDatLTest;
+	intDatLTest.pSysMem = Cube_indicies;
+	intDatLTest.SysMemPitch = 0;
+	intDatLTest.SysMemSlicePitch = 0;
+
+	device->CreateBuffer(&ibLTest, &intDatLTest, &ibuffLTest);
+#pragma endregion
 	
 	toObject.worldMatrix = XMMatrixIdentity();
 	camera = XMMatrixIdentity();
+	toObject2.worldMatrix = XMMatrixIdentity(); 
 
 	camera = XMMatrixIdentity();
-	toObject.projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(65.0f), (float)BACKBUFFER_WIDTH / (float)BACKBUFFER_HEIGHT, 0.1f, 100.0f);
+	toObject.projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(65.0f), ((float)BACKBUFFER_WIDTH / (float)BACKBUFFER_HEIGHT) / 2.0f, 0.1f, 100.0f);
+	toObject2.projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(65.0f), ((float)BACKBUFFER_WIDTH / (float)BACKBUFFER_HEIGHT), 0.1f, 100.0f);
 	timer.Signal();
 
+	camera2 = XMMatrixTranslation(-5,0,0);
 
 	starMatrix = XMMatrixIdentity();
 	starMatrix = XMMatrixTranslation(0, 0, 5);
+
+	boxMatrix = XMMatrixIdentity();
+	boxMatrix = XMMatrixTranslation(-5, 0, 5);
 
 	objMatrix = XMMatrixIdentity();
 	objMatrix = XMMatrixTranslation(5, 0, 5);
@@ -631,46 +691,58 @@ bool DEMO_APP::Run()
 	if (GetAsyncKeyState('W'))
 	{
 		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.001f), camera);
+		camera2 = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.001f), camera2);
 	}
 	if (GetAsyncKeyState('A'))
 	{
 		camera = XMMatrixMultiply(XMMatrixTranslation(-0.001f, 0, 0), camera);
+		camera2 = XMMatrixMultiply(XMMatrixTranslation(-0.001f, 0, 0), camera2);
 	}
 	if (GetAsyncKeyState('S'))
 	{
 		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.001f), camera);
+		camera2 = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.001f), camera2);
 	}
 	if (GetAsyncKeyState('D'))
 	{
 		camera = XMMatrixMultiply(XMMatrixTranslation(0.001f, 0, 0), camera);
+		camera2 = XMMatrixMultiply(XMMatrixTranslation(0.001f, 0, 0), camera2);
 	}
 	if (GetAsyncKeyState(VK_UP))
 	{
 		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, 0.001f, 0));
+		camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, 0.001f, 0));
 	}
 	if (GetAsyncKeyState(VK_DOWN))
 	{
 		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, -0.001f, 0));
+		camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, -0.001f, 0));
 	}
 	if (GetAsyncKeyState(VK_NUMPAD4))
 	{
 		camera = XMMatrixMultiply(XMMatrixRotationY(-0.001f), camera);
+		camera2 = XMMatrixMultiply(XMMatrixRotationY(-0.001f), camera2);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD6))
 	{
 		camera = XMMatrixMultiply(XMMatrixRotationY(0.001f), camera);
+		camera2 = XMMatrixMultiply(XMMatrixRotationY(0.001f), camera2);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD8))
 	{
 		camera = XMMatrixMultiply(XMMatrixRotationX(-0.001f), camera);
+		camera2 = XMMatrixMultiply(XMMatrixRotationX(-0.001f), camera2);
 	}
 	if (GetAsyncKeyState(VK_NUMPAD2))
 	{
 		camera = XMMatrixMultiply(XMMatrixRotationX(0.001f), camera);
+		camera2 = XMMatrixMultiply(XMMatrixRotationX(0.001f), camera2);
 	}
 #pragma endregion 
 
-	context->OMSetRenderTargets(1, &pView, pDSV);
+	context->OMSetRenderTargets(2, &pView, pDSV);
+
+#pragma region ViewPort1
 
 	context->RSSetViewports(1, &viewport);
 
@@ -713,13 +785,13 @@ bool DEMO_APP::Run()
 
 	/////////////////////////////////////////////////////////////////////////
 	// Light
-	constbuffPerFrame.light = light;
-
-	//context->VSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
-	
-	context->UpdateSubresource(cbPerFrameBuffer, 0, NULL, &constbuffPerFrame, 0, 0);
-	
-	context->PSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
+	//constbuffPerFrame.light = light;
+	//
+	////context->VSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
+	//
+	//context->UpdateSubresource(cbPerFrameBuffer, 0, NULL, &constbuffPerFrame, 0, 0);
+	//
+	//context->PSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
 	/////////////////////////////////////////////////////////////////////////
 
 	/////////////////////////////////////////////////////////////////////////
@@ -746,30 +818,193 @@ bool DEMO_APP::Run()
 
 	/////////////////////////////////////////////////////////////////////////
 	// OBJ File
-	objMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians((float)timer.Delta() * 0.5f)), objMatrix);
-	toObject.worldMatrix = objMatrix;
-	
-	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
-	memcpy(sub.pData, &toObject, sizeof(toObject));
-	context->Unmap(ncBuff, 0);
-	
-	UINT offsetOBJ = 0;
-	UINT strideOBJ = sizeof(XMFLOAT3);
-	context->IASetVertexBuffers(0, 1, &vertBuffCube, &strideOBJ, &offsetOBJ);
-	context->IASetIndexBuffer(ibuffCube, DXGI_FORMAT_R32_UINT, offsetOBJ);
-	context->VSSetShader(vShade3, NULL, 0);
-	context->PSSetShader(pShade3, NULL, 0);
-	context->PSSetShaderResources(0, 1, &pSRV2);
-	context->IASetInputLayout(layout3);
-	context->RSSetState(rasState2);
+	//objMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians((float)timer.Delta() * 0.5f)), objMatrix);
+	//toObject.worldMatrix = objMatrix;
+	//
+	//context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
+	//memcpy(sub.pData, &toObject, sizeof(toObject));
+	//context->Unmap(ncBuff, 0);
+	//
+	//UINT offsetOBJ = 0;
+	//UINT strideOBJ = sizeof(XMFLOAT3);
+	//context->IASetVertexBuffers(0, 1, &vertBuffCube, &strideOBJ, &offsetOBJ);
+	//context->IASetIndexBuffer(ibuffCube, DXGI_FORMAT_R32_UINT, offsetOBJ);
+	//context->VSSetShader(vShade3, NULL, 0);
+	//context->PSSetShader(pShade3, NULL, 0);
+	//context->PSSetShaderResources(0, 1, &pSRV2);
+	//context->IASetInputLayout(layout3);
+	//context->RSSetState(rasState2);
 	//context->DrawIndexed(234, 0, 0);
+
+	/////////////////////////////////////////////////////////////////////////
+
+	/////////////////////////////////////////////////////////////////////////
+	// Box
+	//boxMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), boxMatrix);
+	toObject.worldMatrix = boxMatrix;
+
+	D3D11_MAPPED_SUBRESOURCE sub3;
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub3);
+	memcpy(sub3.pData, &toObject, sizeof(toObject));
+	context->Unmap(ncBuff, 0);
+
+	context->VSSetConstantBuffers(0, 1, &ncBuff);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	UINT offsetLTest = 0;
+	UINT strideLTest = sizeof(_OBJ_VERT_);
+
+	context->IASetVertexBuffers(0, 1, &vertBuffLTest, &strideLTest, &offsetLTest);
+	context->IASetIndexBuffer(ibuffLTest, DXGI_FORMAT_R32_UINT, offsetLTest);
+
+	context->VSSetShader(vShade4, NULL, 0);
+	context->PSSetShader(pShade4, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV2);
+	context->PSSetSamplers(0, 1, &samState);
+
+	context->IASetInputLayout(layout4);
+
+	context->RSSetState(rasState2);
+
+	context->DrawIndexed(1692, 0, 0);
+
+	/////////////////////////////////////////////////////////////////////////
+#pragma endregion
+	
+#pragma region ViewPort2
+	context->RSSetViewports(1, &viewport2);
+
+	//float colors[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+	//context->ClearRenderTargetView(pView, colors);
+	//context->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1, 0);
+	/////////////////////////////////////////////////////////////////////////
+	// skybox
+
+	toObject2.viewMatrix = XMMatrixInverse(nullptr, camera2);
+	toObject2.worldMatrix = XMMatrixTranslation(camera2.r[3].m128_f32[0], camera2.r[3].m128_f32[1], camera2.r[3].m128_f32[2]);
+	toObject2.projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(75.0f), ((float)BACKBUFFER_WIDTH / (float)BACKBUFFER_HEIGHT) / 2.0f, 0.1f, 100.0f);
+
+	D3D11_MAPPED_SUBRESOURCE suba;
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &suba);
+	memcpy(suba.pData, &toObject2, sizeof(toObject2));
+	context->Unmap(ncBuff, 0);
+
+	context->VSSetConstantBuffers(0, 1, &ncBuff);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	//UINT offsetSky = 0;
+	//UINT strideSky = sizeof(_OBJ_VERT_);
+
+	context->IASetVertexBuffers(0, 1, &vertBuffSky, &strideSky, &offsetSky);
+	context->IASetIndexBuffer(ibuffSky, DXGI_FORMAT_R32_UINT, offsetSky);
+
+	context->VSSetShader(vShade, NULL, 0);
+	context->PSSetShader(pShade, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV);
+	context->PSSetSamplers(0, 1, &samState);
+
+	context->IASetInputLayout(layout);
+
+	context->RSSetState(rasState);
+
+	context->DrawIndexed(1692, 0, 0);
+
+	context->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1, 0);
+	/////////////////////////////////////////////////////////////////////////
+
+	/////////////////////////////////////////////////////////////////////////
+	// Light
+	//constbuffPerFrame.light = light;
+	//
+	////context->VSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
+	//
+	//context->UpdateSubresource(cbPerFrameBuffer, 0, NULL, &constbuffPerFrame, 0, 0);
+	//
+	//context->PSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
+	/////////////////////////////////////////////////////////////////////////
+
+	/////////////////////////////////////////////////////////////////////////
+	// star
+	starMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), starMatrix);
+	toObject2.worldMatrix = starMatrix;
+
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
+	memcpy(sub.pData, &toObject2, sizeof(toObject2));
+	context->Unmap(ncBuff, 0);
+
+	//UINT offset = 0;
+	//UINT stride = sizeof(SIMPLE_VERTEX);
+	context->IASetVertexBuffers(0, 1, &vertBuff, &stride, &offset);
+	context->IASetIndexBuffer(ibuff, DXGI_FORMAT_R32_UINT, offset);
+	context->VSSetShader(vShade2, NULL, 0);
+	context->PSSetShader(pShade2, NULL, 0);
+	context->IASetInputLayout(layout2);
+	context->RSSetState(rasState2);
+	context->DrawIndexed(60, 0, 0);
 
 
 	/////////////////////////////////////////////////////////////////////////
 
+	/////////////////////////////////////////////////////////////////////////
+	// OBJ File
+	//objMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians((float)timer.Delta() * 0.5f)), objMatrix);
+	//toObject2.worldMatrix = objMatrix;
+	//
+	//context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub);
+	//memcpy(sub.pData, &toObject2, sizeof(toObject2));
+	//context->Unmap(ncBuff, 0);
+	//
+	////UINT offsetOBJ = 0;
+	////UINT strideOBJ = sizeof(XMFLOAT3);
+	//context->IASetVertexBuffers(0, 1, &vertBuffCube, &strideOBJ, &offsetOBJ);
+	//context->IASetIndexBuffer(ibuffCube, DXGI_FORMAT_R32_UINT, offsetOBJ);
+	//context->VSSetShader(vShade3, NULL, 0);
+	//context->PSSetShader(pShade3, NULL, 0);
+	//context->PSSetShaderResources(0, 1, &pSRV2);
+	//context->IASetInputLayout(layout3);
+	//context->RSSetState(rasState2);
+	//context->DrawIndexed(234, 0, 0);
 
+	/////////////////////////////////////////////////////////////////////////
+
+	/////////////////////////////////////////////////////////////////////////
+	// Box
+	//boxMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), boxMatrix);
+	toObject2.worldMatrix = boxMatrix;
+
+	D3D11_MAPPED_SUBRESOURCE subc;
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &subc);
+	memcpy(subc.pData, &toObject2, sizeof(toObject2));
+	context->Unmap(ncBuff, 0);
+
+	context->VSSetConstantBuffers(0, 1, &ncBuff);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	//UINT offsetLTest = 0;
+	//UINT strideLTest = sizeof(_OBJ_VERT_);
+
+	context->IASetVertexBuffers(0, 1, &vertBuffLTest, &strideLTest, &offsetLTest);
+	context->IASetIndexBuffer(ibuffLTest, DXGI_FORMAT_R32_UINT, offsetLTest);
+
+	context->VSSetShader(vShade4, NULL, 0);
+	context->PSSetShader(pShade4, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV2);
+	context->PSSetSamplers(0, 1, &samState);
+
+	context->IASetInputLayout(layout4);
+
+	context->RSSetState(rasState2);
+
+	context->DrawIndexed(1692, 0, 0);
+
+	/////////////////////////////////////////////////////////////////////////
+#pragma endregion
 
 	swapChain->Present(0, 0);
+	
 	return true; 
 }
 
@@ -804,10 +1039,15 @@ bool DEMO_APP::ShutDown()
 	pShade2->Release();
 	layout2->Release();
 	layout3->Release();
+	layout4->Release();
 	rasState2->Release();
 	vShade3->Release();
 	pShade3->Release();
 	cbPerFrameBuffer->Release();
+	vertBuffLTest->Release();
+	ibuffLTest->Release();
+	vShade4->Release();
+	pShade4->Release();
 
 
 	UnregisterClass( L"DirectXApplication", application ); 
