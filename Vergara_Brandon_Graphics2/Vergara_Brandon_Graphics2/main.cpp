@@ -28,11 +28,13 @@ using namespace std;
 #include "OBJ_PS.csh"
 #include "Box_VS.csh"
 #include "Box_PS.csh"
+#include "LightTest_VS.csh"
+#include "LightTest_PS.csh"
 
 
 
-#define BACKBUFFER_WIDTH	500
-#define BACKBUFFER_HEIGHT	500
+#define BACKBUFFER_WIDTH	1280
+#define BACKBUFFER_HEIGHT	720
 
 //************************************************************
 //************ SIMPLE WINDOWS APP CLASS **********************
@@ -87,7 +89,7 @@ class DEMO_APP
 	// BEGIN PART 3
 	// TODO: PART 3 STEP 1
 	ID3D11Buffer *ncBuff;
-	ID3D11Buffer *cbPerFrameBuffer;
+	ID3D11Buffer *lightBuffer;
 	XTime timer;
 
 	XMMATRIX camera;
@@ -130,24 +132,23 @@ public:
 
 	struct Light
 	{
+		XMFLOAT4 diffuse;
 		XMFLOAT3 dir;
 		float pad;
-		XMFLOAT4 ambient;
-		XMFLOAT4 diffuse;
-
+		//XMFLOAT4 ambient;
 	};
 
-	Light light;
-
-	struct cbPerFrame
-	{
-		Light  light;
-	};
-
-	cbPerFrame constbuffPerFrame;
+	//
+	//struct cbPerFrame
+	//{
+	//	Light  light;
+	//};
+	//
+	//cbPerFrame constbuffPerFrame;
 
 	OBJECT toObject;
 	OBJECT toObject2;
+	Light light;
 
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
 	bool Run();
@@ -263,22 +264,23 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wndClass.hbrBackground = (HBRUSH)(COLOR_WINDOWFRAME);
 	//wndClass.hIcon			= LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_FSICON));
+	
 	RegisterClassEx(&wndClass);
-
+	
 	RECT window_size = { 0, 0, BACKBUFFER_WIDTH, BACKBUFFER_HEIGHT };
 	AdjustWindowRect(&window_size, WS_OVERLAPPEDWINDOW, false);
 
 	window = CreateWindow(L"DirectXApplication", L"Lab 1a Line Land", WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX),
 		CW_USEDEFAULT, CW_USEDEFAULT, window_size.right - window_size.left, window_size.bottom - window_size.top,
 		NULL, NULL, application, this);
-
+	
 	ShowWindow(window, SW_SHOW);
 	//********************* END WARNING ************************//
 
 	// TODO: PART 1 STEP 3a
 	DXGI_SWAP_CHAIN_DESC scd;
 	ZeroMemory(&scd, sizeof(DXGI_SWAP_CHAIN_DESC));
-
+	
 	scd.BufferCount = 1;
 	scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -291,6 +293,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	// TODO: PART 1 STEP 4
 	ID3D11Texture2D *backBuffer;
 	swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
+	
 	device->CreateRenderTargetView(backBuffer, NULL, &pView);
 	backBuffer->Release();
 	// TODO: PART 1 STEP 5
@@ -308,7 +311,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewport2.TopLeftY = 0;
 	viewport2.MinDepth = 0;
 	viewport2.MaxDepth = 1;
-
+	
 	SIMPLE_VERTEX star[12];
 #pragma region Star verts
 
@@ -447,8 +450,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	device->CreateVertexShader(OBJ_VS, sizeof(OBJ_VS), NULL, &vShade3);
 	device->CreatePixelShader(OBJ_PS, sizeof(OBJ_PS), NULL, &pShade3);
 
-    device->CreateVertexShader(Box_VS, sizeof(Box_VS), NULL, &vShade4);
-	device->CreatePixelShader(Box_PS, sizeof(Box_PS), NULL, &pShade4);
+    device->CreateVertexShader(LightTest_VS, sizeof(LightTest_VS), NULL, &vShade4);
+	device->CreatePixelShader(LightTest_PS, sizeof(LightTest_PS), NULL, &pShade4);
 
 	D3D11_INPUT_ELEMENT_DESC vLayout[3] =
 	{
@@ -462,7 +465,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	};
 
 	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), Trivial_VS, sizeof(Trivial_VS), &layout);
-	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), Box_VS, sizeof(Box_VS), &layout4);
+	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), LightTest_VS, sizeof(LightTest_VS), &layout4);
 
 	D3D11_INPUT_ELEMENT_DESC vLayout2[2] =
 	{
@@ -603,21 +606,21 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma region LightCode
 
-	light.dir = XMFLOAT3(0.25f, 0.5f, -1.0f);
-	light.ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	light.diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	light.dir = XMFLOAT3(0.0f, 0.0f, 1.0f);
+	//light.ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	light.diffuse = XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f);
 	
 	D3D11_BUFFER_DESC cbLight;
 	ZeroMemory(&cbLight, sizeof(cbLight));
-
+	
 	cbLight.Usage = D3D11_USAGE_DYNAMIC;
 	cbLight.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	cbLight.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	cbLight.ByteWidth = sizeof(cbPerFrame);
+	cbLight.ByteWidth = sizeof(Light);
 	cbLight.MiscFlags = 0;
 	cbLight.StructureByteStride = sizeof(float);
-
-	device->CreateBuffer(&cbLight, NULL, &cbPerFrameBuffer);
+	
+	device->CreateBuffer(&cbLight, NULL, &lightBuffer);
 
 #pragma endregion
 
@@ -718,15 +721,21 @@ bool DEMO_APP::Run()
 		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, -0.001f, 0));
 		camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, -0.001f, 0));
 	}
+
+	XMVECTOR pos = camera.r[3];
+	camera.r[3] = g_XMIdentityR3;
+	XMVECTOR pos2 = camera2.r[3];
+	camera2.r[3] = g_XMIdentityR3;
+
 	if (GetAsyncKeyState(VK_NUMPAD4))
 	{
-		camera = XMMatrixMultiply(XMMatrixRotationY(-0.001f), camera);
-		camera2 = XMMatrixMultiply(XMMatrixRotationY(-0.001f), camera2);
+		camera = XMMatrixMultiply(camera, XMMatrixRotationY(-0.001f));
+		camera2 = XMMatrixMultiply(camera2, XMMatrixRotationY(-0.001f));
 	}
 	if (GetAsyncKeyState(VK_NUMPAD6))
 	{
-		camera = XMMatrixMultiply(XMMatrixRotationY(0.001f), camera);
-		camera2 = XMMatrixMultiply(XMMatrixRotationY(0.001f), camera2);
+		camera = XMMatrixMultiply(camera, XMMatrixRotationY(0.001f));
+		camera2 = XMMatrixMultiply(camera2, XMMatrixRotationY(0.001f));
 	}
 	if (GetAsyncKeyState(VK_NUMPAD8))
 	{
@@ -738,6 +747,10 @@ bool DEMO_APP::Run()
 		camera = XMMatrixMultiply(XMMatrixRotationX(0.001f), camera);
 		camera2 = XMMatrixMultiply(XMMatrixRotationX(0.001f), camera2);
 	}
+
+	camera.r[3] = pos;
+	camera2.r[3] = pos2;
+
 #pragma endregion 
 
 	context->OMSetRenderTargets(2, &pView, pDSV);
@@ -1043,7 +1056,7 @@ bool DEMO_APP::ShutDown()
 	rasState2->Release();
 	vShade3->Release();
 	pShade3->Release();
-	cbPerFrameBuffer->Release();
+	lightBuffer->Release();
 	vertBuffLTest->Release();
 	ibuffLTest->Release();
 	vShade4->Release();

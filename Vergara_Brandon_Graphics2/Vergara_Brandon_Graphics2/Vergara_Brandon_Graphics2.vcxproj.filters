@@ -51,6 +51,8 @@
     <None Include="OBJ_VS.csh" />
     <None Include="Box_VS.csh" />
     <None Include="Box_PS.csh" />
+    <None Include="LightTest_PS.csh" />
+    <None Include="LightTest_VS.csh" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Trivial_PS.hlsl" />
@@ -61,6 +63,8 @@
     <FxCompile Include="OBJ_PS.hlsl" />
     <FxCompile Include="Box_VS.hlsl" />
     <FxCompile Include="Box_PS.hlsl" />
+    <FxCompile Include="LightTest_VS.hlsl" />
+    <FxCompile Include="LightTest_PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="SunsetSkybox.dds" />
