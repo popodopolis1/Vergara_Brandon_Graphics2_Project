@@ -11,7 +11,7 @@ Texture2D baseTexture : register(t0);
 
 SamplerState filters[1] : register(s0);
 
-cbuffer Light : register(b0)
+cbuffer LIGHT : register(b0)
 {
 	float4 diffuse;
 	float3 dir;
@@ -25,15 +25,15 @@ float4 main(INPUT_PIXEL fromVS) : SV_TARGET
 	float lightIntensity;
 	float4 color;
 
-	textureColor = baseTexture.Sample(filters[0], fromVS.texOut) * float4(1, 1, 1, 1);
+	textureColor = baseTexture.Sample(filters[0], fromVS.texOut);
 
 	lightDir = -dir;
-
+	
 	lightIntensity = saturate(dot(lightDir, fromVS.normOut));
-
+	
 	color = saturate(diffuse*lightIntensity);
-
+	
 	color = color * textureColor;
 
-	return color;
+	return textureColor;
 }

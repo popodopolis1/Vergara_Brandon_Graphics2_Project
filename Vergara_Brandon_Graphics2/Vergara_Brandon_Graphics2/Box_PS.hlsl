@@ -7,14 +7,13 @@ struct INPUT_PIXEL
 	float4 normOut : NORMALS;
 };
 
-TextureCube baseTexture : register(t0);
+Texture2D baseTexture : register(t0);
 
 SamplerState filters[1] : register(s0);
 
 float4 main(INPUT_PIXEL fromVS) : SV_TARGET
 {
 	float4 color = baseTexture.Sample(filters[0], fromVS.texOut) * float4(1, 1, 1, 1);
-
 	//Color = tex2D(ColoredTextureSampler, input.textureCoordinates.xy);
 	//Color += tex2D(ColoredTextureSampler, input.textureCoordinates.xy + (0.01));
 	//Color += tex2D(ColoredTextureSampler, input.textureCoordinates.xy - (0.01));

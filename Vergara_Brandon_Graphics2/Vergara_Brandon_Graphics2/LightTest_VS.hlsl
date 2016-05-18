@@ -27,7 +27,7 @@ OUTPUT_VERTEX main(INPUT_VERTEX fromVertexBuffer)
 {
 	OUTPUT_VERTEX sendToRasterizer = (OUTPUT_VERTEX)0;
 
-	fromVertexBuffer.coordinate.y -= 1;
+	//fromVertexBuffer.coordinate.y -= 1;
 
 	float4 localH = { fromVertexBuffer.coordinate, 1 };
 
@@ -39,12 +39,14 @@ OUTPUT_VERTEX main(INPUT_VERTEX fromVertexBuffer)
 
 	float4 texTemp = localH;
 
+	float4 tex = { fromVertexBuffer.texcoords, 1 };
+
 	float4 normTemp = { fromVertexBuffer.norms, 0 };
 
-	normTemp.y -= 1;
+	//normTemp.y -= 1;
 
 	float4 inTemp = { fromVertexBuffer.coordinate, 1 };
-	sendToRasterizer.texOut = inTemp;
+	sendToRasterizer.texOut = tex;
 	sendToRasterizer.normOut = normTemp;
 	sendToRasterizer.normOut = normalize(sendToRasterizer.normOut);
 
