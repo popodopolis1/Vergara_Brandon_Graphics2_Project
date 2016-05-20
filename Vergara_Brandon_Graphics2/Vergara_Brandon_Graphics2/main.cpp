@@ -139,10 +139,9 @@ public:
 
 	struct LIGHT
 	{
-		XMFLOAT4 diffuse;
+		XMFLOAT4 color;
 		XMFLOAT3 dir;
 		float pad;
-		//XMFLOAT4 ambient;
 	};
 
 	//
@@ -318,9 +317,10 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewport2.TopLeftY = 0;
 	viewport2.MinDepth = 0;
 	viewport2.MaxDepth = 1;
-	
+
+#pragma region Star
 	SIMPLE_VERTEX star[12];
-#pragma region Star verts
+
 
 	for (int i = 0; i < 12; ++i)
 	{
@@ -359,7 +359,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		}
 	}
 
-#pragma endregion
 
 	uint indices[60] = { 0, 2, 1, 0, 3, 2, 0, 4, 3, 0, 5, 4, 0, 6, 5, 0, 7, 6, 0, 8, 7, 0, 9, 8, 0, 10, 9, 0, 1, 10, 11, 1, 2, 11, 2, 3, 11, 3, 4, 11, 4, 5, 11, 5, 6, 11, 6, 7, 11, 7, 8, 11, 8, 9, 11, 9, 10, 11, 10, 1 };
 
@@ -395,7 +394,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	intDat.SysMemSlicePitch = 0;
 
 	device->CreateBuffer(&iB, &intDat, &ibuff);
+#pragma endregion
 
+#pragma region Skybox
 	D3D11_BUFFER_DESC vbSky;
 	ZeroMemory(&vbSky, sizeof(vbSky));
 
@@ -426,6 +427,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	intDatSky.SysMemSlicePitch = 0;
 
 	device->CreateBuffer(&ibSky, &intDatSky, &ibuffSky);
+#pragma endregion
 
 	D3D11_TEXTURE2D_DESC descDepth;
 	descDepth.Width = BACKBUFFER_WIDTH;
@@ -448,7 +450,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	device->CreateDepthStencilView(pDepthStencil, &descDSV, &pDSV);
 
-
+#pragma region Shaders
 	device->CreateVertexShader(Trivial_VS, sizeof(Trivial_VS), NULL, &vShade);
 	device->CreatePixelShader(Trivial_PS, sizeof(Trivial_PS), NULL, &pShade);
 
@@ -463,7 +465,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
     device->CreateVertexShader(LightTest_VS, sizeof(LightTest_VS), NULL, &vShade5);
 	device->CreatePixelShader(LightTest_PS, sizeof(LightTest_PS), NULL, &pShade5);
+#pragma endregion
 
+#pragma region Layouts
 	D3D11_INPUT_ELEMENT_DESC vLayout[3] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -491,8 +495,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	};
 
 	device->CreateInputLayout(vLayout3, ARRAYSIZE(vLayout3), OBJ_VS, sizeof(OBJ_VS), &layout3);
+#pragma endregion
 
-
+#pragma region SamplersAndRasterizers
 	D3D11_SAMPLER_DESC descSam = {};
 	descSam.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 	descSam.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -546,8 +551,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	descRas2.AntialiasedLineEnable = TRUE;
 
 	device->CreateRasterizerState(&descRas2, &rasState2);
+#pragma endregion
 
-
+#pragma region Constant Buffer
 	D3D11_BUFFER_DESC cb;
 	ZeroMemory(&cb, sizeof(cb));
 
@@ -559,16 +565,18 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	cb.StructureByteStride = sizeof(float);
 
 	device->CreateBuffer(&cb, NULL, &ncBuff);
+#pragma endregion
+
 
 	thread thread1(CreateDDSTextureFromFile, device, L"SunsetSkybox.dds", nullptr, &pSRV, 0);
 
 	thread thread2(CreateDDSTextureFromFile, device, L"stone_0001_c.dds", nullptr, &pSRV2, 0);
 
 	thread thread3(loadOBJ, "cube.obj", verts, uvs, norms, inds);
-	
-	NEW_VERTEX objCube[8];
 
-#pragma region OBJ verts
+	
+#pragma region OBJ code
+	NEW_VERTEX objCube[8];
 
 	for (int i = 0; i < verts.size(); ++i)
 	{
@@ -582,8 +590,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	{
 		objCube[i].norms = norms[i];
 	}
-
-#pragma endregion
 
 	uint inds1[234];
 
@@ -623,14 +629,13 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	intDatCube.SysMemSlicePitch = 0;
 	
 	device->CreateBuffer(&ibCube, &intDatCube, &ibuffCube);
-
+#pragma endregion
 
 #pragma region LightCode
 
-	light.dir = XMFLOAT3(0.0f, 0.0f, 1.0f);
-	//light.ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	light.diffuse = XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f);
-	
+	light.dir = XMFLOAT3(-1.0f, -0.75f, 0.0f);
+	light.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+
 	D3D11_BUFFER_DESC cbLight;
 	ZeroMemory(&cbLight, sizeof(cbLight));
 	
@@ -689,7 +694,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	quad[0].uvs.z = 0;
 	quad[0].norms.x = 1;
 	quad[0].norms.y = 1;
-	quad[0].norms.z = 0;
+	quad[0].norms.z = 1;
 
 	quad[1].pos.x = 5;
 	quad[1].pos.y = -1;
@@ -699,7 +704,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	quad[1].uvs.z = 0;
 	quad[1].norms.x = 1;
 	quad[1].norms.y = 1;
-	quad[1].norms.z = 0;
+	quad[1].norms.z = 1;
 
 	quad[2].pos.x = -5;
 	quad[2].pos.y = -1;
@@ -709,7 +714,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	quad[2].uvs.z = 0;
 	quad[2].norms.x = 1;
 	quad[2].norms.y = 1;
-	quad[2].norms.z = 0;
+	quad[2].norms.z = 1;
 	
 	quad[3].pos.x = 5;
 	quad[3].pos.y = -1;
@@ -719,7 +724,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	quad[3].uvs.z = 0;
 	quad[3].norms.x = 1;
 	quad[3].norms.y = 1;
-	quad[3].norms.z = 0;
+	quad[3].norms.z = 1;
 
 	uint indic[6] = { 0, 1, 2, 1, 3, 2,};
 
@@ -756,6 +761,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma endregion
 	
+#pragma region Matricies
 	toObject.worldMatrix = XMMatrixIdentity();
 	camera = XMMatrixIdentity();
 	toObject2.worldMatrix = XMMatrixIdentity(); 
@@ -778,13 +784,12 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	quadMatrix = XMMatrixIdentity();
 	quadMatrix = XMMatrixTranslation(0, 0, 5);
+#pragma endregion
 
 	thread1.join();
 	thread2.join();
 	thread3.join();
 }
-
-
 
 //************************************************************
 //************ EXECUTION *************************************
