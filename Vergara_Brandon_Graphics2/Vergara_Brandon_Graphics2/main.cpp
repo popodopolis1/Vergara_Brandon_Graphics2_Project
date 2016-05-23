@@ -92,6 +92,11 @@ class DEMO_APP
 	ID3D11PixelShader *pShade4;
 	ID3D11PixelShader *pShade5;
 
+	//Transparency
+	ID3D11BlendState* Trans;
+	ID3D11RasterizerState* CCWcull;
+	ID3D11RasterizerState* CWcull;
+
 	// BEGIN PART 3
 	// TODO: PART 3 STEP 1
 	ID3D11Buffer *ncBuff;
@@ -103,11 +108,12 @@ class DEMO_APP
 	XMMATRIX objMatrix;
 	XMMATRIX starMatrix;
 	XMMATRIX boxMatrix;
+	XMMATRIX boxMatrix2;
+	XMMATRIX boxMatrix3;
 	XMMATRIX quadMatrix;
 
 public:
-	// BEGIN PART 2
-	// TODO: PART 2 STEP 1
+
 	struct SIMPLE_VERTEX
 	{
 		//float x, y, z, w;
@@ -122,7 +128,6 @@ public:
 		XMFLOAT3 uvs;
 		XMFLOAT3 norms;
 	};
-
 
 	vector<XMFLOAT3> verts;
 	vector<XMFLOAT2> uvs;
@@ -142,6 +147,20 @@ public:
 		XMFLOAT4 color;
 		XMFLOAT3 dir;
 		float pad;
+
+		XMFLOAT4 color2;
+		XMFLOAT3 dir2;
+		float lightRadius;
+		XMFLOAT3 pos;
+		float pad2;
+
+		XMFLOAT4 color3;
+		XMFLOAT3 dir3;
+		float coneRatio;
+		XMFLOAT3 pos2;
+		float pad3;
+
+		XMFLOAT4 camPos;
 	};
 
 	//
@@ -188,21 +207,18 @@ bool loadOBJ(const char* path, vector<XMFLOAT3> &out_verts, vector<XMFLOAT2> &ou
 			XMFLOAT3 vertex;
 			fscanf_s(file, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
 			temp_vertices.push_back(vertex);
-			out_verts.push_back(vertex);
 		}
 		else if (strcmp(lineHeader, "vt") == 0)
 		{
 			XMFLOAT2 uv;
 			fscanf_s(file, "%f %f\n", &uv.x, &uv.y);
-			//temp_uvs.push_back(uv);
-			out_uvs.push_back(uv);
+			temp_uvs.push_back(uv);
 		}
 		else if (strcmp(lineHeader, "vn") == 0)
 		{
 			XMFLOAT3 normal;
 			fscanf_s(file, "%f %f %f\n", &normal.x, &normal.y, &normal.z);
-			//temp_normals.push_back(normal);
-			out_norms.push_back(normal);
+			temp_normals.push_back(normal);
 		}
 		else if (strcmp(lineHeader, "f") == 0)
 		{
@@ -223,27 +239,27 @@ bool loadOBJ(const char* path, vector<XMFLOAT3> &out_verts, vector<XMFLOAT2> &ou
 			normalIndices.push_back(normalIndex[0]);
 			normalIndices.push_back(normalIndex[1]);
 			normalIndices.push_back(normalIndex[2]);
-
-			for (unsigned int i = 0; i < vertexIndices.size(); i++)
-			{
-				uint vertIndex = vertexIndices[i];
-				//XMFLOAT3 vert = temp_vertices[vertIndex - 1];
-				out_inds.push_back(vertIndex);
-			}
-			//for (unsigned int i = 0; i < uvIndices.size(); i++)
-			//{
-			//	unsigned int uvIndex = vertexIndices[i];
-			//	XMFLOAT2 uv = temp_uvs[uvIndex - 1];
-			//	out_uvs.push_back(uv);
-			//}
-			//for (unsigned int i = 0; i < normalIndices.size(); i++)
-			//{
-			//	unsigned int normIndex = vertexIndices[i];
-			//	XMFLOAT3 norm = temp_normals[normIndex - 1];
-			//	out_norms.push_back(norm);
-			//}
-
 		}
+	}
+
+	for (unsigned int i = 0; i < vertexIndices.size(); i++)
+	{
+		uint vertIndex = vertexIndices[i];
+		XMFLOAT3 vert = temp_vertices[vertIndex - 1];
+		out_verts.push_back(vert);
+		out_inds.push_back(i);
+	}
+	for (unsigned int i = 0; i < uvIndices.size(); i++)
+	{
+		unsigned int uvIndex = vertexIndices[i];
+		XMFLOAT2 uv = temp_uvs[uvIndex - 1];
+		out_uvs.push_back(uv);
+	}
+	for (unsigned int i = 0; i < normalIndices.size(); i++)
+	{
+		unsigned int normIndex = vertexIndices[i];
+		XMFLOAT3 norm = temp_normals[normIndex - 1];
+		out_norms.push_back(norm);
 	}
 	
 
@@ -477,7 +493,16 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), Trivial_VS, sizeof(Trivial_VS), &layout);
 	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), Box_VS, sizeof(Box_VS), &layout4);
-	device->CreateInputLayout(vLayout, ARRAYSIZE(vLayout), LightTest_VS, sizeof(LightTest_VS), &layout5);
+
+	D3D11_INPUT_ELEMENT_DESC vLayout4[4] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXTURE_COORDINATES", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMALS", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "POS", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
+	device->CreateInputLayout(vLayout4, ARRAYSIZE(vLayout4), LightTest_VS, sizeof(LightTest_VS), &layout5);
 
 	D3D11_INPUT_ELEMENT_DESC vLayout2[2] =
 	{
@@ -567,14 +592,12 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	device->CreateBuffer(&cb, NULL, &ncBuff);
 #pragma endregion
 
-
 	thread thread1(CreateDDSTextureFromFile, device, L"SunsetSkybox.dds", nullptr, &pSRV, 0);
 
 	thread thread2(CreateDDSTextureFromFile, device, L"stone_0001_c.dds", nullptr, &pSRV2, 0);
 
 	thread thread3(loadOBJ, "cube.obj", verts, uvs, norms, inds);
 
-	
 #pragma region OBJ code
 	NEW_VERTEX objCube[8];
 
@@ -632,9 +655,21 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 #pragma endregion
 
 #pragma region LightCode
+	//Directional Light
+	light.dir = { -1.0f, -0.75f, 0.0f };
+	light.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-	light.dir = XMFLOAT3(-1.0f, -0.75f, 0.0f);
-	light.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	//Point Light
+	light.color2 = { .0f, 1.0f, 1.0f, 1.0f };
+	light.dir2 = { -1.0f, -0.75f, 0.0f };
+	light.pos = { 2.5f, -1.5f, 0.0f };
+	light.lightRadius = 10.0f;
+
+	//Spotlight
+	light.color3 = { 1.0f, 0.0f, 0.0f, 1.0f };
+	light.dir3 = { -1.0f, -1.0f, 0.0f };
+	light.pos2 = { 2.5f, -1.5f, 0.0f };
+	light.coneRatio = 0.93f;
 
 	D3D11_BUFFER_DESC cbLight;
 	ZeroMemory(&cbLight, sizeof(cbLight));
@@ -643,10 +678,13 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	cbLight.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	cbLight.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	cbLight.ByteWidth = sizeof(LIGHT);
-	cbLight.MiscFlags = 0;
-	cbLight.StructureByteStride = sizeof(float);
-	
-	device->CreateBuffer(&cbLight, NULL, &lightBuffer);
+
+	D3D11_SUBRESOURCE_DATA intLight;
+	intLight.pSysMem = &light;
+	intLight.SysMemPitch = 0;
+	intLight.SysMemSlicePitch = 0;
+
+	device->CreateBuffer(&cbLight, &intLight, &lightBuffer);
 
 #pragma endregion
 
@@ -692,9 +730,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	quad[0].uvs.x = 0;
 	quad[0].uvs.y = 0;
 	quad[0].uvs.z = 0;
-	quad[0].norms.x = 1;
+	quad[0].norms.x = 0;
 	quad[0].norms.y = 1;
-	quad[0].norms.z = 1;
+	quad[0].norms.z = 0;
 
 	quad[1].pos.x = 5;
 	quad[1].pos.y = -1;
@@ -702,9 +740,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	quad[1].uvs.x = 1;
 	quad[1].uvs.y = 0;
 	quad[1].uvs.z = 0;
-	quad[1].norms.x = 1;
+	quad[1].norms.x = 0;
 	quad[1].norms.y = 1;
-	quad[1].norms.z = 1;
+	quad[1].norms.z = 0;
 
 	quad[2].pos.x = -5;
 	quad[2].pos.y = -1;
@@ -712,9 +750,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	quad[2].uvs.x = 0;
 	quad[2].uvs.y = 1;
 	quad[2].uvs.z = 0;
-	quad[2].norms.x = 1;
+	quad[2].norms.x = 0;
 	quad[2].norms.y = 1;
-	quad[2].norms.z = 1;
+	quad[2].norms.z = 0;
 	
 	quad[3].pos.x = 5;
 	quad[3].pos.y = -1;
@@ -722,9 +760,9 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	quad[3].uvs.x = 1;
 	quad[3].uvs.y = 1;
 	quad[3].uvs.z = 0;
-	quad[3].norms.x = 1;
+	quad[3].norms.x = 0;
 	quad[3].norms.y = 1;
-	quad[3].norms.z = 1;
+	quad[3].norms.z = 0;
 
 	uint indic[6] = { 0, 1, 2, 1, 3, 2,};
 
@@ -760,6 +798,40 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	device->CreateBuffer(&iBQ, &intDatQ, &ibuffQuad);
 
 #pragma endregion
+
+#pragma region Transparency
+	D3D11_BLEND_DESC blends;
+	ZeroMemory(&blends, sizeof(blends));
+
+	D3D11_RENDER_TARGET_BLEND_DESC renTar;
+	ZeroMemory(&renTar, sizeof(renTar));
+
+	renTar.BlendEnable = true;
+	renTar.SrcBlend = D3D11_BLEND_SRC_COLOR;
+	renTar.DestBlend = D3D11_BLEND_BLEND_FACTOR;
+	renTar.BlendOp = D3D11_BLEND_OP_ADD;
+	renTar.SrcBlendAlpha = D3D11_BLEND_ONE;
+	renTar.DestBlendAlpha = D3D11_BLEND_ZERO;
+	renTar.BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	renTar.RenderTargetWriteMask = D3D10_COLOR_WRITE_ENABLE_ALL;
+
+	blends.AlphaToCoverageEnable = false;
+	blends.RenderTarget[0] = renTar;
+
+	device->CreateBlendState(&blends, &Trans);
+
+	D3D11_RASTERIZER_DESC cmdesc;
+	ZeroMemory(&cmdesc, sizeof(D3D11_RASTERIZER_DESC));
+
+	cmdesc.FillMode = D3D11_FILL_SOLID;
+	cmdesc.CullMode = D3D11_CULL_BACK;
+
+	cmdesc.FrontCounterClockwise = true;
+	device->CreateRasterizerState(&cmdesc, &CCWcull);
+
+	cmdesc.FrontCounterClockwise = false;
+	device->CreateRasterizerState(&cmdesc, &CWcull);
+#pragma endregion
 	
 #pragma region Matricies
 	toObject.worldMatrix = XMMatrixIdentity();
@@ -768,16 +840,20 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	camera = XMMatrixIdentity();
 	toObject.projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(65.0f), ((float)BACKBUFFER_WIDTH / (float)BACKBUFFER_HEIGHT) / 2.0f, 0.1f, 100.0f);
-	toObject2.projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(65.0f), ((float)BACKBUFFER_WIDTH / (float)BACKBUFFER_HEIGHT), 0.1f, 100.0f);
+	toObject2.projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(65.0f), ((float)BACKBUFFER_WIDTH / (float)BACKBUFFER_HEIGHT) / 2.0f, 0.1f, 100.0f);
 	timer.Signal();
-
-	camera2 = XMMatrixTranslation(-5,0,0);
+	
+	camera2 = XMMatrixTranslation(0,0,-5);
 
 	starMatrix = XMMatrixIdentity();
 	starMatrix = XMMatrixTranslation(0, 0, 5);
 
 	boxMatrix = XMMatrixIdentity();
-	boxMatrix = XMMatrixTranslation(-5, 0, 5);
+	boxMatrix = XMMatrixTranslation(-5, 0.5f, 5);
+	boxMatrix2 = XMMatrixIdentity();
+	boxMatrix2 = XMMatrixTranslation(-7, 0.5f, 7);
+	boxMatrix3 = XMMatrixIdentity();
+	boxMatrix3 = XMMatrixTranslation(-3, 0.5f, 3);
 
 	objMatrix = XMMatrixIdentity();
 	objMatrix = XMMatrixTranslation(5, 0, 5);
@@ -800,34 +876,34 @@ bool DEMO_APP::Run()
 #pragma region CameraControl
 	if (GetAsyncKeyState('W'))
 	{
-		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.001f), camera);
-		camera2 = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.001f), camera2);
+		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.005f), camera);
+		camera2 = XMMatrixMultiply(XMMatrixTranslation(0, 0, 0.005f), camera2);
 	}
 	if (GetAsyncKeyState('A'))
 	{
-		camera = XMMatrixMultiply(XMMatrixTranslation(-0.001f, 0, 0), camera);
-		camera2 = XMMatrixMultiply(XMMatrixTranslation(-0.001f, 0, 0), camera2);
+		camera = XMMatrixMultiply(XMMatrixTranslation(-0.005f, 0, 0), camera);
+		camera2 = XMMatrixMultiply(XMMatrixTranslation(-0.005f, 0, 0), camera2);
 	}
 	if (GetAsyncKeyState('S'))
 	{
-		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.001f), camera);
-		camera2 = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.001f), camera2);
+		camera = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.005f), camera);
+		camera2 = XMMatrixMultiply(XMMatrixTranslation(0, 0, -0.005f), camera2);
 	}
 	if (GetAsyncKeyState('D'))
 	{
-		camera = XMMatrixMultiply(XMMatrixTranslation(0.001f, 0, 0), camera);
-		camera2 = XMMatrixMultiply(XMMatrixTranslation(0.001f, 0, 0), camera2);
+		camera = XMMatrixMultiply(XMMatrixTranslation(0.005f, 0, 0), camera);
+		camera2 = XMMatrixMultiply(XMMatrixTranslation(0.005f, 0, 0), camera2);
 	}
-	if (GetAsyncKeyState(VK_UP))
-	{
-		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, 0.001f, 0));
-		camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, 0.001f, 0));
-	}
-	if (GetAsyncKeyState(VK_DOWN))
-	{
-		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, -0.001f, 0));
-		camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, -0.001f, 0));
-	}
+	//if (GetAsyncKeyState(VK_UP))
+	//{
+	//	camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, 0.001f, 0));
+	//	camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, 0.001f, 0));
+	//}
+	//if (GetAsyncKeyState(VK_DOWN))
+	//{
+	//	camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, -0.001f, 0));
+	//	camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, -0.001f, 0));
+	//}
 
 	XMVECTOR pos = camera.r[3];
 	camera.r[3] = g_XMIdentityR3;
@@ -858,9 +934,70 @@ bool DEMO_APP::Run()
 	camera.r[3] = pos;
 	camera2.r[3] = pos2;
 
+	light.pos2 = { camera.r[3].m128_f32[0], camera.r[3].m128_f32[1], camera.r[3].m128_f32[2] };
+	light.dir3 = { camera.r[2].m128_f32[0], camera.r[2].m128_f32[1], camera.r[2].m128_f32[2] };
+
+	light.camPos = { camera.r[3].m128_f32[0], camera.r[3].m128_f32[1], camera.r[3].m128_f32[2], camera.r[3].m128_f32[3] };
+
 #pragma endregion 
 
-	context->OMSetRenderTargets(2, &pView, pDSV);
+#pragma region Directional Light Control
+	if (GetAsyncKeyState('Y'))
+	{
+		light.dir = { light.dir.x, light.dir.y + (float)(timer.Delta())/100, light.dir.z };
+	}
+	if (GetAsyncKeyState('H'))
+	{
+		light.dir = { light.dir.x, light.dir.y - (float)(timer.Delta())/100, light.dir.z };
+	}
+#pragma endregion
+
+#pragma region Point Light Control
+	if (GetAsyncKeyState('J'))
+	{
+		light.pos = { light.pos.x - (float)(timer.Delta()) / 100, light.pos.y, light.pos.z };
+	}
+	if (GetAsyncKeyState('L'))
+	{
+		light.pos = { light.pos.x + (float)(timer.Delta()) / 100, light.pos.y, light.pos.z };
+	}
+	if (GetAsyncKeyState('I'))
+	{
+		light.pos = { light.pos.x, light.pos.y, light.pos.z + (float)(timer.Delta()) / 100 };
+	}
+	if (GetAsyncKeyState('K'))
+	{
+		light.pos = { light.pos.x, light.pos.y, light.pos.z - (float)(timer.Delta()) / 100 };
+	}
+#pragma endregion
+
+#pragma region Spotlight Control
+	if (GetAsyncKeyState(VK_UP))
+	{
+		light.dir3 = { light.dir3.x, light.dir3.y + (float)(timer.Delta()) / 100, light.dir3.z };
+	}
+	if (GetAsyncKeyState(VK_DOWN))
+	{
+		light.dir3 = { light.dir3.x, light.dir3.y - (float)(timer.Delta()) / 100, light.dir3.z };
+	}
+	if (GetAsyncKeyState(VK_LEFT))
+	{
+		light.pos2 = { light.pos2.x - (float)(timer.Delta()) / 100, light.pos2.y, light.pos2.z };
+	}
+	if (GetAsyncKeyState(VK_RIGHT))
+	{
+		light.pos2 = { light.pos2.x + (float)(timer.Delta()) / 100, light.pos2.y, light.pos2.z };
+	}
+#pragma endregion
+
+	context->OMSetRenderTargets(1, &pView, pDSV);
+	context->OMSetBlendState(0, 0, 0xffffffff);
+	context->PSSetConstantBuffers(0, 1, &lightBuffer);
+
+	D3D11_MAPPED_SUBRESOURCE subLight;
+	context->Map(lightBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &subLight);
+	memcpy(subLight.pData, &light, sizeof(light));
+	context->Unmap(lightBuffer, 0);
 
 #pragma region ViewPort1
 
@@ -904,17 +1041,6 @@ bool DEMO_APP::Run()
 	/////////////////////////////////////////////////////////////////////////
 
 	/////////////////////////////////////////////////////////////////////////
-	// Light
-	//constbuffPerFrame.light = light;
-	//
-	////context->VSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
-	//
-	//context->UpdateSubresource(cbPerFrameBuffer, 0, NULL, &constbuffPerFrame, 0, 0);
-	//
-	//context->PSSetConstantBuffers(0, 1, &cbPerFrameBuffer);
-	/////////////////////////////////////////////////////////////////////////
-
-	/////////////////////////////////////////////////////////////////////////
 	// star
 	starMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), starMatrix);
 	toObject.worldMatrix = starMatrix;
@@ -934,8 +1060,6 @@ bool DEMO_APP::Run()
 	context->DrawIndexed(60, 0, 0);
 
 	
-	/////////////////////////////////////////////////////////////////////////
-
 	/////////////////////////////////////////////////////////////////////////
 
 	/////////////////////////////////////////////////////////////////////////
@@ -987,6 +1111,9 @@ bool DEMO_APP::Run()
 	//boxMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), boxMatrix);
 	toObject.worldMatrix = boxMatrix;
 
+	float blendFactor[] = { 0.75f, 0.75f, 0.75f, 1.0f };
+	context->OMSetBlendState(Trans, blendFactor, 0xffffffff);
+
 	D3D11_MAPPED_SUBRESOURCE sub3;
 	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub3);
 	memcpy(sub3.pData, &toObject, sizeof(toObject));
@@ -1011,6 +1138,70 @@ bool DEMO_APP::Run()
 
 	context->RSSetState(rasState2);
 
+	context->RSSetState(CCWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	context->RSSetState(CWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	////Box2
+	toObject.worldMatrix = boxMatrix2;
+
+	D3D11_MAPPED_SUBRESOURCE sub3z;
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub3z);
+	memcpy(sub3z.pData, &toObject, sizeof(toObject));
+	context->Unmap(ncBuff, 0);
+
+	context->VSSetConstantBuffers(0, 1, &ncBuff);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	context->IASetVertexBuffers(0, 1, &vertBuffLTest, &strideLTest, &offsetLTest);
+	context->IASetIndexBuffer(ibuffLTest, DXGI_FORMAT_R32_UINT, offsetLTest);
+
+	context->VSSetShader(vShade4, NULL, 0);
+	context->PSSetShader(pShade4, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV2);
+	context->PSSetSamplers(0, 1, &samState);
+
+	context->IASetInputLayout(layout4);
+
+	context->RSSetState(rasState2);
+
+	context->RSSetState(CCWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	context->RSSetState(CWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	////Box2
+	toObject.worldMatrix = boxMatrix3;
+
+	D3D11_MAPPED_SUBRESOURCE sub3x;
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &sub3x);
+	memcpy(sub3x.pData, &toObject, sizeof(toObject));
+	context->Unmap(ncBuff, 0);
+
+	context->VSSetConstantBuffers(0, 1, &ncBuff);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	context->IASetVertexBuffers(0, 1, &vertBuffLTest, &strideLTest, &offsetLTest);
+	context->IASetIndexBuffer(ibuffLTest, DXGI_FORMAT_R32_UINT, offsetLTest);
+
+	context->VSSetShader(vShade4, NULL, 0);
+	context->PSSetShader(pShade4, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV2);
+	context->PSSetSamplers(0, 1, &samState);
+
+	context->IASetInputLayout(layout4);
+
+	context->RSSetState(rasState2);
+
+	context->RSSetState(CCWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	context->RSSetState(CWcull);
 	context->DrawIndexed(1692, 0, 0);
 
 	/////////////////////////////////////////////////////////////////////////
@@ -1018,10 +1209,9 @@ bool DEMO_APP::Run()
 	
 #pragma region ViewPort2
 	context->RSSetViewports(1, &viewport2);
+	context->OMSetBlendState(0, 0, 0xffffffff);
+	light.camPos = { camera2.r[3].m128_f32[0], camera2.r[3].m128_f32[1], camera2.r[3].m128_f32[2], camera2.r[3].m128_f32[3] };
 
-	//float colors[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
-	//context->ClearRenderTargetView(pView, colors);
-	//context->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1, 0);
 	/////////////////////////////////////////////////////////////////////////
 	// skybox
 
@@ -1037,9 +1227,6 @@ bool DEMO_APP::Run()
 	context->VSSetConstantBuffers(0, 1, &ncBuff);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	//UINT offsetSky = 0;
-	//UINT strideSky = sizeof(_OBJ_VERT_);
 
 	context->IASetVertexBuffers(0, 1, &vertBuffSky, &strideSky, &offsetSky);
 	context->IASetIndexBuffer(ibuffSky, DXGI_FORMAT_R32_UINT, offsetSky);
@@ -1139,6 +1326,7 @@ bool DEMO_APP::Run()
 	// Box
 	//boxMatrix = XMMatrixMultiply(XMMatrixRotationY(XMConvertToRadians(timer.Delta() * 0.5f)), boxMatrix);
 	toObject2.worldMatrix = boxMatrix;
+	context->OMSetBlendState(Trans, blendFactor, 0xffffffff);
 
 	D3D11_MAPPED_SUBRESOURCE subc;
 	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &subc);
@@ -1148,9 +1336,6 @@ bool DEMO_APP::Run()
 	context->VSSetConstantBuffers(0, 1, &ncBuff);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	//UINT offsetLTest = 0;
-	//UINT strideLTest = sizeof(_OBJ_VERT_);
 
 	context->IASetVertexBuffers(0, 1, &vertBuffLTest, &strideLTest, &offsetLTest);
 	context->IASetIndexBuffer(ibuffLTest, DXGI_FORMAT_R32_UINT, offsetLTest);
@@ -1164,13 +1349,81 @@ bool DEMO_APP::Run()
 
 	context->RSSetState(rasState2);
 
+	context->RSSetState(CCWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	context->RSSetState(CWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	///Box2
+	toObject2.worldMatrix = boxMatrix2;
+	context->OMSetBlendState(Trans, blendFactor, 0xffffffff);
+
+	D3D11_MAPPED_SUBRESOURCE subcz;
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &subcz);
+	memcpy(subcz.pData, &toObject2, sizeof(toObject2));
+	context->Unmap(ncBuff, 0);
+
+	context->VSSetConstantBuffers(0, 1, &ncBuff);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+
+	context->IASetVertexBuffers(0, 1, &vertBuffLTest, &strideLTest, &offsetLTest);
+	context->IASetIndexBuffer(ibuffLTest, DXGI_FORMAT_R32_UINT, offsetLTest);
+
+	context->VSSetShader(vShade4, NULL, 0);
+	context->PSSetShader(pShade4, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV2);
+	context->PSSetSamplers(0, 1, &samState);
+
+	context->IASetInputLayout(layout4);
+
+	context->RSSetState(rasState2);
+
+	context->RSSetState(CCWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	context->RSSetState(CWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	///Box3
+	toObject2.worldMatrix = boxMatrix3;
+	context->OMSetBlendState(Trans, blendFactor, 0xffffffff);
+
+	D3D11_MAPPED_SUBRESOURCE subca;
+	context->Map(ncBuff, 0, D3D11_MAP_WRITE_DISCARD, NULL, &subca);
+	memcpy(subca.pData, &toObject2, sizeof(toObject2));
+	context->Unmap(ncBuff, 0);
+
+	context->VSSetConstantBuffers(0, 1, &ncBuff);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+
+	context->IASetVertexBuffers(0, 1, &vertBuffLTest, &strideLTest, &offsetLTest);
+	context->IASetIndexBuffer(ibuffLTest, DXGI_FORMAT_R32_UINT, offsetLTest);
+
+	context->VSSetShader(vShade4, NULL, 0);
+	context->PSSetShader(pShade4, NULL, 0);
+	context->PSSetShaderResources(0, 1, &pSRV2);
+	context->PSSetSamplers(0, 1, &samState);
+
+	context->IASetInputLayout(layout4);
+
+	context->RSSetState(rasState2);
+
+	context->RSSetState(CCWcull);
+	context->DrawIndexed(1692, 0, 0);
+
+	context->RSSetState(CWcull);
 	context->DrawIndexed(1692, 0, 0);
 
 	/////////////////////////////////////////////////////////////////////////
 #pragma endregion
-
-	swapChain->Present(0, 0);
 	
+	swapChain->Present(0, 0);
+
 	return true; 
 }
 
@@ -1220,6 +1473,9 @@ bool DEMO_APP::ShutDown()
 	ibuffQuad->Release();
 	vShade5->Release();
 	pShade5->Release();
+	Trans->Release();
+	CCWcull->Release();
+	CWcull->Release();
 
 
 	UnregisterClass( L"DirectXApplication", application ); 

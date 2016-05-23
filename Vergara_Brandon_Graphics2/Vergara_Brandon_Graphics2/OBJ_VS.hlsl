@@ -14,23 +14,11 @@ struct OUTPUT_VERTEX
 	float4 normOut : NORMALS;
 };
 
-struct Light
-{
-	float3 dir;
-	float4 ambient;
-	float4 diffuse;
-};
-
 cbuffer OBJECT : register(b0)
 {
 	float4x4 worldMatrix;
 	float4x4 viewMatrix;
 	float4x4 projectionMatrix;
-};
-
-cbuffer cbPerFrame : register(b1)
-{
-	Light light;
 };
 
 OUTPUT_VERTEX main(INPUT_VERTEX fromVertexBuffer)

@@ -5,6 +5,7 @@ struct INPUT_VERTEX
 	float3 coordinate : POSITION;
 	float3 texcoords : TEXTURE_COORDINATES;
 	float3 norms : NORMALS;
+	float3 worldPos : POS;
 };
 
 
@@ -13,6 +14,7 @@ struct OUTPUT_VERTEX
 	float4 projectedCoordinate : SV_POSITION;
 	float4 texOut : TEXTURE_COORDINATES;
 	float4 normOut : NORMALS;
+	float4 worldPos : POS;
 };
 
 
@@ -30,6 +32,9 @@ OUTPUT_VERTEX main(INPUT_VERTEX fromVertexBuffer)
 	float4 localH = { fromVertexBuffer.coordinate, 1 };
 
 	localH = mul(localH, worldMatrix);
+
+	sendToRasterizer.worldPos = localH;
+
 	localH = mul(localH, viewMatrix);
 	localH = mul(localH, projectionMatrix);
 
