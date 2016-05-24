@@ -59,18 +59,11 @@ float4 main(INPUT_PIXEL fromVS) : SV_TARGET
 	float attenz = 1.0f - saturate((inCone - surfaceRatio) / (inCone - outCone));
 	float4 sResult = sRatio * color3 * attenz;
 
-		/*Specular
-		float4 viewDir = normalize(camWorldPos - surfacePos);
-		float3 halfVector = normalize(-dir + viewDir);
-		intensity = max(saturate(dot(fromVS.normOut, normalize(halfVector)))^specularpower,0);
-		float4 spResult = intensity * color * specularIntensity;
-		*/
-
+	//Point light specular
 	float3 specDir = normalize(camPos.xyz - fromVS.worldPos.xyz);
 	float3 halfVec = normalize((lightDir) + specDir);
-	float pIntensity = pow(saturate(dot(fromVS.normOut, normalize(halfVec))), 32.0f);
+	float pIntensity = pow(saturate(dot(fromVS.normOut, normalize(halfVec))), 50.0f);
 	float4 specResult = color2 * atten * pIntensity;
-
 
 	//Add different lights to saturate and multiply EX. saturate(result + result2)
 	return textureColor * saturate(dResult + pResult + sResult + specResult);

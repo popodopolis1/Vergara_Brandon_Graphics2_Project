@@ -119,6 +119,7 @@ public:
 		//float x, y, z, w;
 		XMFLOAT4 pos;
 		XMFLOAT4 col;
+		XMFLOAT3 norm;
 		//float r, g, b, a;
 	};
 
@@ -375,6 +376,13 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		}
 	}
 
+	for (int i = 0; i < 12; ++i)
+	{
+		star[i].norm.x = 0;
+		star[i].norm.y = 1;
+		star[i].norm.z = 0;
+	}
+
 
 	uint indices[60] = { 0, 2, 1, 0, 3, 2, 0, 4, 3, 0, 5, 4, 0, 6, 5, 0, 7, 6, 0, 8, 7, 0, 9, 8, 0, 10, 9, 0, 1, 10, 11, 1, 2, 11, 2, 3, 11, 3, 4, 11, 4, 5, 11, 5, 6, 11, 6, 7, 11, 7, 8, 11, 8, 9, 11, 9, 10, 11, 10, 1 };
 
@@ -504,10 +512,12 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	device->CreateInputLayout(vLayout4, ARRAYSIZE(vLayout4), LightTest_VS, sizeof(LightTest_VS), &layout5);
 
-	D3D11_INPUT_ELEMENT_DESC vLayout2[2] =
+	D3D11_INPUT_ELEMENT_DESC vLayout2[4] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMALS", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "POS", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
 	device->CreateInputLayout(vLayout2, ARRAYSIZE(vLayout2), Star_VS, sizeof(Star_VS), &layout2);
@@ -894,16 +904,16 @@ bool DEMO_APP::Run()
 		camera = XMMatrixMultiply(XMMatrixTranslation(0.005f, 0, 0), camera);
 		camera2 = XMMatrixMultiply(XMMatrixTranslation(0.005f, 0, 0), camera2);
 	}
-	//if (GetAsyncKeyState(VK_UP))
-	//{
-	//	camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, 0.001f, 0));
-	//	camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, 0.001f, 0));
-	//}
-	//if (GetAsyncKeyState(VK_DOWN))
-	//{
-	//	camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, -0.001f, 0));
-	//	camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, -0.001f, 0));
-	//}
+	if (GetAsyncKeyState(VK_UP))
+	{
+		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, 0.001f, 0));
+		camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, 0.001f, 0));
+	}
+	if (GetAsyncKeyState(VK_DOWN))
+	{
+		camera = XMMatrixMultiply(camera, XMMatrixTranslation(0, -0.001f, 0));
+		camera2 = XMMatrixMultiply(camera2, XMMatrixTranslation(0, -0.001f, 0));
+	}
 
 	XMVECTOR pos = camera.r[3];
 	camera.r[3] = g_XMIdentityR3;
@@ -968,25 +978,6 @@ bool DEMO_APP::Run()
 	if (GetAsyncKeyState('K'))
 	{
 		light.pos = { light.pos.x, light.pos.y, light.pos.z - (float)(timer.Delta()) / 100 };
-	}
-#pragma endregion
-
-#pragma region Spotlight Control
-	if (GetAsyncKeyState(VK_UP))
-	{
-		light.dir3 = { light.dir3.x, light.dir3.y + (float)(timer.Delta()) / 100, light.dir3.z };
-	}
-	if (GetAsyncKeyState(VK_DOWN))
-	{
-		light.dir3 = { light.dir3.x, light.dir3.y - (float)(timer.Delta()) / 100, light.dir3.z };
-	}
-	if (GetAsyncKeyState(VK_LEFT))
-	{
-		light.pos2 = { light.pos2.x - (float)(timer.Delta()) / 100, light.pos2.y, light.pos2.z };
-	}
-	if (GetAsyncKeyState(VK_RIGHT))
-	{
-		light.pos2 = { light.pos2.x + (float)(timer.Delta()) / 100, light.pos2.y, light.pos2.z };
 	}
 #pragma endregion
 

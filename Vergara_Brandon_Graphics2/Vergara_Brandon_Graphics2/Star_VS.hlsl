@@ -4,12 +4,16 @@ struct INPUT_VERTEX
 {
 	float4 coordinate : POSITION;
 	float4 color : COLOR;
+	float3 norm : NORMALS;
+	float3 worldPos : POS;
 };
 
 struct OUTPUT_VERTEX
 {
 	float4 projectedCoordinate : SV_POSITION;
 	float4 colorOut : COLOR;
+	float4 normOut : NORMALS;
+	float4 worldPos : POS;
 };
 
 // TODO: PART 3 STEP 2a
@@ -34,12 +38,15 @@ OUTPUT_VERTEX main(INPUT_VERTEX fromVertexBuffer)
 	float4 localH = fromVertexBuffer.coordinate;
 
 	localH = mul(localH, worldMatrix);
+
+	float4 normTemp = { fromVertexBuffer.norm, 0 };
+	sendToRasterizer.worldPos = localH;
 	localH = mul(localH, viewMatrix);
 	localH = mul(localH, projectionMatrix);
 
 	//sendToRasterizer.projectedCoordinate.w = 1;
 	sendToRasterizer.projectedCoordinate = localH;
-
+	sendToRasterizer.normOut = normTemp;
 	//sendToRasterizer.projectedCoordinate = localH;
 	sendToRasterizer.colorOut = fromVertexBuffer.color;
 	return sendToRasterizer;
